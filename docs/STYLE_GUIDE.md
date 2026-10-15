@@ -141,6 +141,27 @@ Link line for the top of each README:
 English | [简体中文](README.zh-CN.md)
 ```
 
+README headings in Simplified Chinese:
+
+| English | Simplified Chinese |
+|---|---|
+| Status | 状态 |
+| What this is | 简介 |
+| What this is not | 不适用范围 |
+| Quick start | 快速开始 |
+| Configuration | 配置 |
+| Architecture | 架构 |
+| Repository layout | 仓库结构 |
+| Contributing | 参与贡献 |
+| Security | 安全 |
+| License | 许可证 |
+
+Link line for the top of `README.zh-CN.md`:
+
+```markdown
+[English](README.md) | 简体中文
+```
+
 When a translation falls behind and cannot be fixed in the same PR, mark it at the top with a one-line note and open an issue to resync. Do not leave a stale translation unmarked.
 
 ## 5. Forbidden content in public repos
@@ -511,48 +532,34 @@ Quick grep list to run before review. Treat a match as a prompt to check, not a 
 - Dated audit titles: `rg -i '(audit|acceptance).*20[0-9]{2}-[0-9]{2}-[0-9]{2}'`
 - Process narration: `rg -i 'this round|the owner approved'`
 
-## 14. Cleanup plan across repos
+## 14. Applying the guide to an existing repository
 
-One PR per repository. Each PR touches documentation only. Private content is moved out, not only deleted, so nothing is lost.
+Apply the guide one repository at a time, as one documentation-only PR per repository. Private content is moved to a private location, not only deleted, so nothing is lost.
 
-Note: removing text from the current tree does not remove it from git history. Rewriting history is out of scope for this cleanup and requires separate, explicit authorization.
+Removing text from the current tree does not remove it from git history. Rewriting history is out of scope and requires separate, explicit authorization.
 
-Wave 1 - org-wide templates and the most visible or most affected repositories.
+Steps for one repository:
 
-| Repository | Reason |
-|---|---|
-| This guide, README template, PR template, CONTRIBUTING snippet | Templates set the standard every later PR follows. |
-| QuantRuntimeSettings | Console repo with the most internal audit and status content. |
-| QuantPlatformKit | Shared foundation referenced by every other repo. |
-| UsEquityStrategies | Reference strategy package; its README shapes the others. |
-
-Wave 2 - broker platforms. These share a similar setup-doc pattern and the same private-identifier risk.
-
-CharlesSchwabPlatform, InteractiveBrokersPlatform, LongBridgePlatform, BinancePlatform, FirstradePlatform, AlpacaPlatform, QmtPlatform.
-
-Wave 3 - data and snapshot pipelines and other strategy packages. Same setup-doc pattern at larger volume.
-
-UsEquitySnapshotPipelines, HkEquitySnapshotPipelines, CnEquitySnapshotPipelines, CryptoLivePoolPipelines, ResearchSignalContextPipelines, MarketSignalSources, HkEquityStrategies, CnEquityStrategies, CryptoStrategies, QuantStrategyPlugins.
-
-Wave 4 - tooling and research. Lower visibility; last so that the standard is settled.
-
-AIAuditBridge, QuantAdvisorResearch, PoliticalEventTrackingResearch, IBKRGatewayManager, SchwabTokenAutoRefresher.
-
-Per-repo steps:
-
-1. Copy private content to the private ops repository.
-2. Rewrite the README to the skeleton.
+1. Move private content out of the public tree to a private location.
+2. Align `README.md` and `README.zh-CN.md` to the skeleton in section 3.
 3. Move stray docs into `docs/` with kebab-case names.
-4. Add or sync `README.zh-CN.md`; translate Chinese-only docs to English where it helps outside readers (section 4).
-5. Remove banned content per section 5.
-6. Add or update `CHANGELOG.md` entries if relevant.
-7. Open one documentation-only PR.
+4. Remove banned content per section 5.
+5. Replace real identifiers with placeholders or a config reference.
+6. Add `CHANGELOG.md` entries if relevant.
+7. Run the section 13 grep list.
+8. Open one documentation-only PR.
 
 ## 15. Adoption
 
-The guide is enforced in three light ways.
+The guide is enforced in four light ways.
 
-- The PR template includes a checkbox: "This PR follows the documentation style guide." A checked box is the author's statement, not proof.
+- The org-wide `PULL_REQUEST_TEMPLATE.md` in this repository applies to every repository that has no template of its own. It contains the style-guide checkbox: a checked box is the author's statement, not proof.
+- Each repository's `CONTRIBUTING.md` links to this guide in one line:
+
+  ```markdown
+  Documentation follows the [QuantStrategyLab documentation style guide](https://github.com/QuantStrategyLab/.github/blob/main/docs/STYLE_GUIDE.md).
+  ```
+
 - Reviewers apply the section 13 checklist to documentation PRs.
 - A CI step may run the grep list from section 13 and warn on matches. No specific tool is required; a simple script is enough. Treat warnings as prompts, not hard failures, so the check does not block legitimate content such as a real placeholder in an example.
 
