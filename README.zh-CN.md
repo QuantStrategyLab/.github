@@ -9,6 +9,7 @@ QuantStrategyLab 各仓库共用的组织级文件。
 | 路径 | 用途 |
 |---|---|
 | `docs/STYLE_GUIDE.md` | 所有公开仓库的文档规范。 |
+| `docs/advisory-research-boundary.md` | 投顾研究项目与交易项目之间的边界。 |
 | `profile/README.md` | 组织 GitHub 主页上显示的介绍。 |
 
 ## 参与贡献

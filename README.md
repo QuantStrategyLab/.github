@@ -9,6 +9,7 @@ Organization-wide files for QuantStrategyLab repositories.
 | Path | Purpose |
 |---|---|
 | `docs/STYLE_GUIDE.md` | Documentation style guide for all public repositories. |
+| `docs/advisory-research-boundary.md` | Boundary between advisory research and trading projects. |
 | `profile/README.md` | Text shown on the organization's GitHub profile page. |
 
 ## Contributing
