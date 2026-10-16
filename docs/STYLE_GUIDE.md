@@ -49,7 +49,9 @@ If a sentence needs more than one qualifier to stay true, split it into two sent
 
 ## 3. README skeleton
 
-Every public repository README uses this skeleton, in this order. Keep section headings exactly as written so tables of contents match across repositories.
+Organization metadata repositories and organization profile READMEs may use a shorter structure: purpose, contents, and contributing information. Installation, runtime configuration, and trading disclaimers are required only when relevant. Repository-root README translations still follow section 4.
+
+All other public repository READMEs use this skeleton, in this order. Keep section headings exactly as written so tables of contents match across repositories.
 
 Required sections: title, Status, What this is, What this is not, Quick start, Configuration, Repository layout, Contributing, Security, License.
 
@@ -224,7 +226,7 @@ docs/
 
 Naming rules:
 
-- Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional top-level names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`.
+- Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional documentation names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`, `STYLE_GUIDE`.
 - No dates in file names, except ADRs, which use a sequence number.
 - ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`.
 - Number ADRs sequentially. Never reuse or renumber an existing ADR.
@@ -506,8 +508,8 @@ The date banner, the merge status, and the PR number are removed. Status is a pr
 
 Apply to any documentation PR.
 
-- [ ] README follows the required skeleton order.
-- [ ] One disclaimer, near the top, not repeated.
+- [ ] README follows the section 3 structure for its repository type.
+- [ ] Where relevant, one disclaimer appears near the top, not repeated.
 - [ ] No banned marketing words or filler phrases.
 - [ ] No emoji in headings, prose, or tables.
 - [ ] No dated status banners or audit or acceptance titles.
@@ -515,7 +517,7 @@ Apply to any documentation PR.
 - [ ] No PR-number status tables and no CI head SHAs in prose.
 - [ ] No real bucket, project, domain, account, or home-path identifiers; placeholders used.
 - [ ] No secret names tied to a private deployment.
-- [ ] Configuration presented as a table with required and default columns.
+- [ ] Where relevant, configuration is presented as a table with required and default columns.
 - [ ] `README.md` and `README.zh-CN.md` both exist and are updated together in the same PR.
 - [ ] New documents are in English unless there is a clear reason otherwise.
 - [ ] Links resolve and point to files that exist.
