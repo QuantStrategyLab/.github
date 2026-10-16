@@ -1,63 +1,48 @@
 # Documentation Style Guide
 
-This guide applies to every public repository in the QuantStrategyLab organization.
+This guide applies to every public repository in the QuantStrategyLab organization. It describes how we write documentation so that someone outside the organization can install, run, and understand a project without any of our internal context. It also lists what must not appear in a public repository.
 
 ## 1. Purpose and scope
 
-This guide defines how we write documentation in public repositories so that an outside reader can install, run, and understand a project without context from our internal work. It also defines what must not appear in public repositories.
+Covered by this guide:
 
-It applies to:
+- `README.md` and `README.zh-CN.md`
+- files under `docs/`
+- `CONTRIBUTING.md` and `CHANGELOG.md`
+- pull request descriptions and commit messages
+- code comments and docstrings
+- web UI copy and locale files
+- inline API docs and generated reference
 
-| File or surface | Covered |
-|---|---|
-| `README.md`, `README.zh-CN.md` | Yes |
-| Files under `docs/` | Yes |
-| `CONTRIBUTING.md`, `CHANGELOG.md` | Yes |
-| Pull request descriptions and commit messages | Yes |
-| Code comments and docstrings | Yes |
-| Web UI copy and locale strings | Yes |
-| Inline API docs and generated reference | Yes |
+Private repositories are out of scope. They may follow the guide, but nothing enforces it there. Section 6 says where internal notes belong instead.
 
-The guide does not cover private repositories. Private repositories may follow it, but they are out of scope for enforcement. See section 6 for where internal notes belong.
-
-When this guide and a repository's existing convention disagree, this guide wins for public-facing text. Open a docs PR to align the repository.
+Where this guide and a repository's existing conventions disagree, this guide wins for public-facing text. Open a docs pull request to bring the repository in line.
 
 ## 2. Audience and tone
 
-Readers are outside developers and quantitative trading hobbyists. They may have never seen our internal process. Assume no shared context beyond general programming and trading knowledge.
+Readers are outside developers and people who trade as a hobby. They have not seen our internal process, so assume general programming and trading knowledge and nothing more.
 
-Rules:
+Write plainly. Short sentences, one idea each. Explain a term the first time it appears, or link to `docs/GLOSSARY.md` or the organization glossary. State facts and behavior instead of narrating how we arrived at them.
 
-- Write plainly. Short sentences. One idea per sentence.
-- Explain a term on first use, or link to `docs/GLOSSARY.md` or the org-level glossary. Do not assume a reader knows what a scheduler, adapter, or gateway means in our context.
-- Use one disclaimer per README. State it once near the top. Do not repeat it in every section.
-- State facts and behaviour. Do not narrate your process, your approval, or your history.
-- Use tables when a list has more than one attribute per item.
-- Avoid long nested bullet lists. Three levels is the practical maximum; prefer a table or a paragraph.
+Habits to avoid:
 
-Banned words and phrases:
+- Marketing adjectives: *powerful*, *seamless*, *robust*, *cutting-edge*, *comprehensive*, *world-class*, *next-generation*.
+- Filler openings: *It is worth noting*, *In summary*, *Let's dive in*, *Needless to say*.
+- Process narration: *this round*, *in this PR we*, *the owner approved*, *as agreed*.
+- Stacked qualifiers. If a sentence needs several to stay true, split it in two.
+- Emoji in headings, prose, or tables.
 
-| Category | Do not use |
-|---|---|
-| Marketing adjectives | powerful, seamless, robust, cutting-edge, comprehensive, blazing, best-in-class, world-class, next-generation |
-| Filler openings | It is worth noting, In summary, Let's dive in, As we all know, Needless to say |
-| Process narration | this round, this task, in this PR we, I have approved, the owner approved, as agreed |
-| Hedge stacking | combining several qualifiers in one sentence where one would do |
-| Emoji | any emoji in headings, prose, or tables |
+State the trading disclaimer once, near the top of a README, and leave it there. Use a table when each item in a list has more than one attribute. Avoid nesting bullet lists past three levels; a table or a short paragraph usually reads better.
 
-If a sentence needs more than one qualifier to stay true, split it into two sentences.
+## 3. README structure
 
-## 3. README skeleton
+Organization metadata repositories and the organization profile README need less. A short statement of purpose, a list of contents, and how to contribute are enough. Installation, runtime configuration, and the trading disclaimer appear only when they apply. Translated READMEs still follow section 4.
 
-Organization metadata repositories and organization profile READMEs may use a shorter structure: purpose, contents, and contributing information. Installation, runtime configuration, and trading disclaimers are required only when relevant. Repository-root README translations still follow section 4.
-
-All other public repository READMEs use this skeleton, in this order. Keep section headings exactly as written so tables of contents match across repositories.
+Every other public repository README uses this skeleton, in order. Keep the headings exactly as written so tables of contents match across repositories.
 
 Required sections: title, Status, What this is, What this is not, Quick start, Configuration, Repository layout, Contributing, Security, License.
 
-Optional sections: Architecture, and any domain-specific section that does not duplicate the required ones. Optional sections go after Configuration and before Repository layout.
-
-Template:
+Optional sections: Architecture, and any domain-specific section that does not repeat a required one. Optional sections go after Configuration and before Repository layout.
 
 ````markdown
 # <Project name>
@@ -116,31 +101,34 @@ See `SECURITY.md`. Do not open a public issue for a vulnerability.
 <License name and a link to LICENSE.>
 ````
 
-Rules for the skeleton:
+Notes on the skeleton:
 
-- The one-sentence summary under the title must not contain a status claim.
-- Status is the second section. It holds the single disclaimer.
-- Configuration uses a table. Mark each variable required or optional and give a default. Use placeholders such as `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. Never a real value.
-- Architecture links out rather than duplicating detail in the README.
-- Do not add a dated status banner. Status is a present-tense fact, not a log.
+- The summary under the title says what the project does; it does not claim a status.
+- Status is the second section and holds the single disclaimer.
+- Configuration is a table. Mark each variable required or optional, give a default, and use placeholders such as `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. Never a real value.
+- Architecture links out instead of repeating detail in the README.
+- No dated status banners. Status is a present-tense fact, not a log.
 
-## 4. Language policy
+## 4. Language
 
-English is the default language for public documents. Simplified Chinese is the second language for the README.
+English is the default for public documents. Simplified Chinese is the second language for the README.
 
-Rules:
+- Every repository ships both `README.md` (English) and `README.zh-CN.md` (Simplified Chinese). They mirror each other section for section, in the same order, with the same headings translated, and each links to the other at the top.
+- Keep both files in sync in the same pull request. A change to one that alters meaning requires the matching change to the other.
+- Write other documents in English by default. A Chinese-only document outside the README is allowed but discouraged; when you rewrite one substantially, consider moving it to English.
+- A translation sibling is named `<name>.zh-CN.md`, or `<name>.md` for an English sibling of a Chinese file. A translation must not contain information missing from its source.
+- Code identifiers, file names, environment variable names, and API names stay in English, including inside Chinese text.
 
-- Every repository has both `README.md` (English) and `README.zh-CN.md` (Simplified Chinese). They mirror each other section-for-section, in the same order, with the same headings translated. Each file links to the other at the top.
-- Keep the two README files in sync in the same pull request. A change to one that changes meaning requires the matching change to the other.
-- Write other documents in English by default. New documents are English unless there is a clear reason to write them in Chinese.
-- A Chinese-only document outside the README is allowed but discouraged. When you substantially rewrite one, consider moving it to English.
-- An optional translation sibling is named `<name>.zh-CN.md` (or `<name>.md` for an English sibling of a Chinese file). A translation must not contain information missing from its source.
-- Code identifiers, file names, environment variable names, and API names stay in English everywhere, including inside Chinese text.
-
-Link line for the top of each README:
+Top of each README:
 
 ```markdown
 English | [简体中文](README.zh-CN.md)
+```
+
+Top of `README.zh-CN.md`:
+
+```markdown
+[English](README.md) | 简体中文
 ```
 
 README headings in Simplified Chinese:
@@ -158,43 +146,33 @@ README headings in Simplified Chinese:
 | Security | 安全 |
 | License | 许可证 |
 
-Link line for the top of `README.zh-CN.md`:
+When a translation falls behind and cannot be fixed in the same PR, mark it with a one-line note at the top and open an issue to resync. Do not leave a stale translation unmarked.
 
-```markdown
-[English](README.md) | 简体中文
-```
+## 5. Content that stays out of public repositories
 
-When a translation falls behind and cannot be fixed in the same PR, mark it at the top with a one-line note and open an issue to resync. Do not leave a stale translation unmarked.
+None of the following belongs in a public repository, whether in README files, `docs/`, comments, pull request descriptions, or UI strings.
 
-## 5. Forbidden content in public repos
-
-The following must not appear in any public repository, including README files, `docs/`, comments, PR descriptions, and UI strings.
-
-| Category | Examples | What to do instead |
+| Category | Examples | Instead |
 |---|---|---|
-| Internal audit logs and acceptance reports | "Console gap audit, 2026-10-15"; acceptance reports; gate reasoning | Move to the private ops repo. Public docs describe behaviour only. |
-| Evidence dumps | Tables of checks, fixture results, raw command output with hashes | Summarize the outcome in the PR. Keep raw evidence in the private ops repo. |
-| Gate and approval reasoning | Which draft PRs exist; what the owner approved; boundary notes | Keep in the PR or the private ops repo, not in `docs/`. |
-| Task scope notes | "this round", "in this task", phase codes such as P0-P6 or T06 with no definition | Remove. If a concept is public, define it plainly in `docs/ARCHITECTURE.md`. |
+| Internal audit logs and acceptance reports | "Console gap audit, 2026-10-15"; acceptance reports; gate reasoning | Move to the private ops repository. Public docs describe behavior only. |
+| Evidence dumps | Tables of checks, fixture results, raw command output with hashes | Summarize the outcome in the PR; keep raw evidence in the private ops repository. |
+| Gate and approval reasoning | Which draft PRs exist, what the owner approved, boundary notes | Keep in the PR or the private ops repository, not in `docs/`. |
+| Task scope notes | "this round", "in this task", undefined phase codes such as P0-P6 or T06 | Remove. If a concept is public, define it plainly in `docs/ARCHITECTURE.md`. |
 | Agent or job identifiers | Job IDs, runner names, agent names, which agent ran what | Remove. Irrelevant to outside readers. |
 | Owner approvals | "approved by <maintainer>" | Remove from public docs; record in the PR if needed. |
 | PR-number status tables | Tables listing a PR number per phase | Describe the capability, not the PR. Link PRs only in `CHANGELOG.md`. |
-| CI head SHAs | 40-character hex identifiers in prose | Do not include. CI status lives in the PR. |
-| Account or broker identities | Account numbers, login names, broker account labels | Remove. Never name a specific real account. |
+| CI head SHAs | 40-character hex identifiers in prose | Leave out. CI status lives in the PR. |
+| Account or broker identities | Account numbers, login names, broker account labels | Remove. Never name a real account. |
 | Personal infrastructure | Real bucket names, cloud project IDs, `workers.dev` subdomains, home paths | Use `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. |
 | Private secrets or token names | Secret names tied to a private deployment, token mount paths | Use a generic placeholder such as `BROKER_API_KEY`. |
 | Unqualified performance claims | Real P&L or returns without method and disclaimer | Include method, period, and the disclaimer, or omit. |
-| Dated status banners | "2026-09-08 source check: merged; acceptance pending" | Replace with a present-tense status sentence or remove. |
+| Dated status banners | "2026-09-08 source check: merged; acceptance pending" | Replace with a present-tense status sentence, or remove. |
 
-If content is useful internally, it moves to a private location. Removing text from the current tree does not remove it from git history; see section 14.
+If the content is useful internally, move it to a private location. Removing it from the current tree does not remove it from git history; see section 14.
 
-## 6. Where internal notes go instead
+## 6. Where internal notes go
 
-Internal notes do not belong in public repositories. Put them in the private ops repository, or in a local folder outside any repository.
-
-If a note must live in the working tree, use an ignored path. Never commit it.
-
-Sample `.gitignore` block:
+Internal notes do not belong in a public repository. Keep them in the private ops repository, or in a local folder outside any repository. If a note has to live in the working tree, put it in an ignored path and never commit it.
 
 ```gitignore
 .local/
@@ -203,16 +181,11 @@ ops-notes/
 *.internal.md
 ```
 
-Rules:
+Public docs describe behavior, not history. History goes to `CHANGELOG.md` and pull requests. Dated reports, evidence tables, and approval reasoning go to the private ops repository. Worktree and absolute local paths never appear in committed files.
 
-- Public docs describe behaviour, not history.
-- History goes to `CHANGELOG.md` and to pull requests.
-- Dated reports, evidence tables, and approval reasoning go to the private ops repository.
-- Worktree paths and absolute local paths never appear in committed files.
+## 7. docs/ layout and naming
 
-## 7. Docs layout and naming
-
-Use this structure under `docs/`:
+Under `docs/`:
 
 ```
 docs/
@@ -224,14 +197,11 @@ docs/
   <name>.zh-CN.md       optional translation sibling
 ```
 
-Naming rules:
-
 - Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional documentation names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`, `STYLE_GUIDE`.
 - No dates in file names, except ADRs, which use a sequence number.
-- ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`.
-- Number ADRs sequentially. Never reuse or renumber an existing ADR.
+- ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`. Number them sequentially; never reuse or renumber one.
 
-Write an ADR when a decision is hard to reverse, affects more than one repository, or changes a public interface. Each ADR states context, decision, and consequences, and is marked with one of these statuses as the first line after the title:
+Write an ADR when a decision is hard to reverse, affects more than one repository, or changes a public interface. Each ADR states context, decision, and consequences, and carries a status on the first line after the title:
 
 ```
 Status: proposed
@@ -239,28 +209,16 @@ Status: accepted
 Status: superseded by ADR-NNNN
 ```
 
-Do not put dates of internal reviews in an ADR. Do not put approval names in an ADR. If a decision is superseded, link the replacement and stop editing the old file.
+Leave internal review dates and approval names out of an ADR. When a decision is superseded, link the replacement and stop editing the old file.
 
 ## 8. CHANGELOG format
 
-Follow Keep a Changelog. The file is `CHANGELOG.md`. The unreleased section is at the top.
+Follow Keep a Changelog. The file is `CHANGELOG.md`, with the unreleased section at the top. Use these sections, in this order, only when they have entries: Added, Changed, Fixed, Removed, Security.
 
-Sections, in this order, only when they have entries:
-
-- Added
-- Changed
-- Fixed
-- Removed
-- Security
-
-Rules:
-
-- Write entries for users, not for maintainers. Describe the observable change.
-- Link pull requests here when useful. This is the one place PR numbers are allowed in public docs.
-- Use the version as a heading. Do not use dates of internal reviews.
-- Keep entries one line where possible.
-
-Example:
+- Write entries for users, not maintainers. Describe the observable change.
+- Link pull requests here when useful. This is the only place PR numbers belong in public docs.
+- Use the version as a heading, not a date from an internal review.
+- Keep entries to one line where possible.
 
 ```markdown
 ## [Unreleased]
@@ -275,9 +233,9 @@ Example:
   instrument currency ([#123](https://example.com/pull/123)).
 ```
 
-## 9. Pull request description format
+## 9. Pull request descriptions and commits
 
-Write PR descriptions in English. Use this template. Fill every section; write "none" when a section does not apply.
+Write PR descriptions in English. Fill every section of this template; write "none" where a section does not apply.
 
 ```markdown
 ## Summary
@@ -306,24 +264,22 @@ Write PR descriptions in English. Use this template. Fill every section; write "
 <What breaks and the migration. Write "none" if none.>
 ```
 
-Do not paste internal job logs, agent transcripts, evidence tables, or approval notes into a PR description. A PR that changes documentation only should say so in the Summary.
+Do not paste internal job logs, agent transcripts, evidence tables, or approval notes into a PR description. A documentation-only PR should say so in the Summary.
 
 Commit messages:
 
-- Use the imperative mood: "add order preview", not "added" or "adds".
-- Keep the subject at 72 characters or fewer.
-- Use Conventional Commits prefixes: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
-- Put a body when the change needs context. Do not reference task codes or round numbers.
+- Imperative mood: "add order preview", not "added" or "adds".
+- Subject of 72 characters or fewer.
+- Conventional Commits prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- A body when the change needs context. No task codes or round numbers.
 
 ## 10. Code comments and docstrings
 
-Comments explain why, not what. If the code shows what happens, the comment is not needed.
+Comments explain why, not what. If the code already shows what happens, drop the comment.
 
-Rules:
-
-- No ticket, job, phase, or round references in comments. No `// P0`, no `# T06`, no `# this round`.
+- No ticket, job, phase, or round references. No `// P0`, no `# T06`, no `# this round`.
 - No commented-out code. Delete it; git keeps it.
-- TODOs use the format `TODO(<handle>): <description>` and include an issue link when one exists.
+- TODOs read `TODO(<handle>): <description>` and link an issue when one exists.
 
 ```python
 # TODO(octocat): cache the token across retries; see <issue-link>
@@ -359,23 +315,21 @@ TypeScript uses TSDoc:
  */
 ```
 
-Comments and docstrings are in English in every repository.
+Comments and docstrings are English in every repository.
 
 ## 11. Web UI copy
 
 User-facing text explains the current state and the next action a user can take. It does not explain our process.
 
-Rules:
+- Say what is true now and what the user should do next: "No strategies are enabled. Add one to begin."
+- Keep audit, gate, evidence, and approval text out of the UI.
+- Do not show internal status codes. Translate each code into a plain label, defined once.
+- Keep user-facing strings in locale files, not inline in components.
+- Provide an English string for every key. A Chinese locale file is optional and must not contain keys missing from the English one.
 
-- Say what is true now and what the user should do next. "No strategies are enabled. Add one to begin."
-- Do not put audit, gate, evidence, or approval text in the UI.
-- Do not show internal status codes. Translate a code into a plain user-facing label, defined once.
-- Keep all user-facing strings in locale files, not inline in components.
-- Provide an English string for every key. A Chinese locale file is optional and must not contain keys missing from the English file.
+## 12. Before and after
 
-## 12. Before / after examples
-
-### Snippet A - README status section
+### README status section
 
 Before:
 
@@ -405,9 +359,9 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for how settings reach a
 runtime.
 ```
 
-The stage codes are removed. If a reader needs the runtime model, it belongs in `docs/ARCHITECTURE.md` in plain language, not as a control-plane status log.
+The stage codes are gone. If a reader needs the runtime model, it belongs in `docs/ARCHITECTURE.md` in plain language, not here.
 
-### Snippet B - internal audit document
+### Internal audit document
 
 Before:
 
@@ -438,9 +392,9 @@ The audit document leaves the repository and moves to the private ops repository
 - Fixed a blank strategy console page caused by locale initialization order.
 ```
 
-The dated title, the SHA, the evidence table, and the draft-PR discussion are removed.
+The dated title, the SHA, the evidence table, and the draft-PR discussion are gone.
 
-### Snippet C - setup instructions
+### Setup instructions
 
 Before:
 
@@ -463,9 +417,9 @@ python3 python/scripts/qslctl.py check-all --projects-root "$PROJECTS_ROOT"
 ```
 ````
 
-The process date, the approval note, the IAM binding count, and the absolute home path are removed. The bucket name becomes a placeholder.
+The process date, the approval note, the IAM binding count, and the absolute home path are gone. The bucket name becomes a placeholder.
 
-### Snippet D - Chinese header with status banner
+### Chinese header with status banner
 
 Before:
 
@@ -491,7 +445,7 @@ The gate reads only data the caller injects. It does not call a broker and
 does not enable live trading.
 ```
 
-The zh-CN sibling, `account-new-risk-gate.zh-CN.md`, mirrors the English file section-for-section with the same headings translated, links to the English file at the top, and carries no information the English file lacks:
+The zh-CN sibling, `account-new-risk-gate.zh-CN.md`, mirrors the English file section for section with the same headings translated, links to the English file at the top, and carries no information the English file lacks:
 
 ```markdown
 [English](account-new-risk-gate.md) | 简体中文
@@ -502,17 +456,17 @@ The zh-CN sibling, `account-new-risk-gate.zh-CN.md`, mirrors the English file se
 它只读取调用方注入的数据，不调用券商，也不开启实盘交易。
 ```
 
-The date banner, the merge status, and the PR number are removed. Status is a present-tense fact.
+The date banner, the merge status, and the PR number are gone. Status is a present-tense fact.
 
-## 13. Reviewer checklist
+## 13. Review checklist
 
-Apply to any documentation PR.
+Apply this to any documentation PR.
 
 - [ ] README follows the section 3 structure for its repository type.
 - [ ] Where relevant, one disclaimer appears near the top, not repeated.
 - [ ] No banned marketing words or filler phrases.
 - [ ] No emoji in headings, prose, or tables.
-- [ ] No dated status banners or audit or acceptance titles.
+- [ ] No dated status banners, audit titles, or acceptance titles.
 - [ ] No evidence tables, gate reasoning, approvals, or task-scope notes.
 - [ ] No PR-number status tables and no CI head SHAs in prose.
 - [ ] No real bucket, project, domain, account, or home-path identifiers; placeholders used.
@@ -524,7 +478,7 @@ Apply to any documentation PR.
 - [ ] Code comments avoid ticket, job, and round references.
 - [ ] UI strings are in locale files and describe state and next action.
 
-Quick grep list to run before review. Treat a match as a prompt to check, not a certain failure:
+Grep list to run before review. Treat a match as a prompt to check, not a certain failure:
 
 - Absolute home paths: `rg '/Users/|/home/'`
 - Non-placeholder buckets: `rg 'gs://'`
@@ -536,11 +490,7 @@ Quick grep list to run before review. Treat a match as a prompt to check, not a 
 
 ## 14. Applying the guide to an existing repository
 
-Apply the guide one repository at a time, as one documentation-only PR per repository. Private content is moved to a private location, not only deleted, so nothing is lost.
-
-Removing text from the current tree does not remove it from git history. Rewriting history is out of scope and requires separate, explicit authorization.
-
-Steps for one repository:
+Apply the guide one repository at a time, as a single documentation-only PR. Move private content to a private location rather than deleting it, so nothing is lost. Removing text from the current tree does not remove it from git history; rewriting history is out of scope and needs separate, explicit authorization.
 
 1. Move private content out of the public tree to a private location.
 2. Align `README.md` and `README.zh-CN.md` to the skeleton in section 3.
@@ -555,7 +505,7 @@ Steps for one repository:
 
 The guide is enforced in four light ways.
 
-- The org-wide `PULL_REQUEST_TEMPLATE.md` in this repository applies to every repository that has no template of its own. It contains the style-guide checkbox: a checked box is the author's statement, not proof.
+- The org-wide `PULL_REQUEST_TEMPLATE.md` in this repository applies to every repository without a template of its own. It carries the style-guide checkbox; a checked box is the author's statement, not proof.
 - Each repository's `CONTRIBUTING.md` links to this guide in one line:
 
   ```markdown
@@ -563,6 +513,6 @@ The guide is enforced in four light ways.
   ```
 
 - Reviewers apply the section 13 checklist to documentation PRs.
-- A CI step may run the grep list from section 13 and warn on matches. No specific tool is required; a simple script is enough. Treat warnings as prompts, not hard failures, so the check does not block legitimate content such as a real placeholder in an example.
+- A CI step may run the section 13 grep list and warn on matches. No specific tool is required; a simple script is enough. Treat warnings as prompts, not hard failures, so the check does not block legitimate content such as a real placeholder in an example.
 
-This guide lives in the organization-level `.github` repository so every repository can link to one copy. Changes go through a pull request to that repository. State the problem, the change, and the effect on existing repositories in the PR description.
+This guide lives in the organization-level `.github` repository so every repository can link to one copy. Changes go through a pull request to that repository. State the problem, the change, and the effect on existing repositories.
