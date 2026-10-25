@@ -6,7 +6,7 @@ This guide applies to every public repository in the QuantStrategyLab organizati
 
 Covered by this guide:
 
-- `README.md` and `README.zh-CN.md`
+- README files in the languages a project actually uses
 - files under `docs/`
 - `CONTRIBUTING.md` and `CHANGELOG.md`
 - pull request descriptions and commit messages
@@ -16,7 +16,7 @@ Covered by this guide:
 
 Private repositories are out of scope. They may follow the guide, but nothing enforces it there. Section 6 says where internal notes belong instead.
 
-Where this guide and a repository's existing conventions disagree, this guide wins for public-facing text. Open a docs pull request to bring the repository in line.
+Where this guide and a repository's existing conventions disagree, follow the repository's convention when it reflects a real audience or platform requirement; otherwise update the text in a focused documentation change.
 
 ## 2. Audience and tone
 
@@ -28,7 +28,7 @@ Habits to avoid:
 
 - Marketing adjectives: *powerful*, *seamless*, *robust*, *cutting-edge*, *comprehensive*, *world-class*, *next-generation*.
 - Filler openings: *It is worth noting*, *In summary*, *Let's dive in*, *Needless to say*.
-- Process narration: *this round*, *in this PR we*, *the owner approved*, *as agreed*.
+- Unnecessary process narration in reader-facing text: *this round*, *in this PR we*, *the owner approved*, *as agreed*.
 - Stacked qualifiers. If a sentence needs several to stay true, split it in two.
 - Emoji in headings, prose, or tables.
 
@@ -38,11 +38,7 @@ State the trading disclaimer once, near the top of a README, and leave it there.
 
 Organization metadata repositories and the organization profile README need less. A short statement of purpose, a list of contents, and how to contribute are enough. Installation, runtime configuration, and the trading disclaimer appear only when they apply. Translated READMEs still follow section 4.
 
-Every other public repository README uses this skeleton, in order. Keep the headings exactly as written so tables of contents match across repositories.
-
-Required sections: title, Status, What this is, What this is not, Quick start, Configuration, Repository layout, Contributing, Security, License.
-
-Optional sections: Architecture, and any domain-specific section that does not repeat a required one. Optional sections go after Configuration and before Repository layout.
+Most project READMEs read well with the following outline. Treat it as a default, not a fixed template: adapt the headings, order and length to the project and its audience, and keep only the sections that help a reader install, run or understand it. A small library and a data pipeline do not need the same headings.
 
 ````markdown
 # <Project name>
@@ -101,25 +97,25 @@ See `SECURITY.md`. Do not open a public issue for a vulnerability.
 <License name and a link to LICENSE.>
 ````
 
-Notes on the skeleton:
+Notes on the outline:
 
 - The summary under the title says what the project does; it does not claim a status.
-- Status is the second section and holds the single disclaimer.
+- A status or disclaimer section near the top holds the single disclaimer, when the project needs one.
 - Configuration is a table. Mark each variable required or optional, give a default, and use placeholders such as `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. Never a real value.
 - Architecture links out instead of repeating detail in the README.
-- No dated status banners. Status is a present-tense fact, not a log.
+- Avoid dated status banners in a README. Status is a present-tense fact; dated history belongs in `CHANGELOG.md`, release notes or a retained evidence record.
 
 ## 4. Language
 
-English is the default for public documents. Simplified Chinese is the second language for the README.
+Developer documentation is normally written in English, which keeps code, commands and review discussion consistent across repositories. Language follows the actual audience and the project's existing convention, not a fixed number of files.
 
-- Every repository ships both `README.md` (English) and `README.zh-CN.md` (Simplified Chinese). They mirror each other section for section, in the same order, with the same headings translated, and each links to the other at the top.
-- Keep both files in sync in the same pull request. A change to one that alters meaning requires the matching change to the other.
-- Write other documents in English by default. A Chinese-only document outside the README is allowed but discouraged; when you rewrite one substantially, consider moving it to English.
-- A translation sibling is named `<name>.zh-CN.md`, or `<name>.md` for an English sibling of a Chinese file. A translation must not contain information missing from its source.
+- A project may keep a Simplified Chinese README, guides or reference pages when its readers need them. Keep an existing translation accurate when you change the source it covers; do not invent a translation or a parallel file that no one maintains.
+- Repositories are not required to mirror READMEs section for section, to use a fixed set of headings, or to ship both English and Chinese versions. Preserve an existing bilingual pair where it is useful, and let either side carry project-specific sections.
+- A translation sibling is named `<name>.zh-CN.md`, or `<name>.md` for an English sibling of a Chinese file. A translation must not contain information missing from its source. Mark a translation that has fallen behind, or update it with the change, rather than leaving it silently stale.
 - Code identifiers, file names, environment variable names, and API names stay in English, including inside Chinese text.
+- Pull request titles and descriptions and commit messages are normally English. A repository or team that works in another language may use it consistently; do not mix languages within one PR description without a reason.
 
-Top of each README:
+Top of a README that has a translation:
 
 ```markdown
 English | [简体中文](README.zh-CN.md)
@@ -131,7 +127,7 @@ Top of `README.zh-CN.md`:
 [English](README.md) | 简体中文
 ```
 
-README headings in Simplified Chinese:
+When a Chinese README uses translated headings, these are the usual equivalents:
 
 | English | Simplified Chinese |
 |---|---|
@@ -146,17 +142,15 @@ README headings in Simplified Chinese:
 | Security | 安全 |
 | License | 许可证 |
 
-When a translation falls behind and cannot be fixed in the same PR, mark it with a one-line note at the top and open an issue to resync. Do not leave a stale translation unmarked.
-
 ## 5. Content that stays out of public repositories
 
-None of the following belongs in a public repository, whether in README files, `docs/`, comments, pull request descriptions, or UI strings.
+The following belongs outside public repositories, whether it would appear in README files, `docs/`, comments, pull request descriptions, or UI strings. Keep it in the private ops repository, approved protected storage, or a local ignored path.
 
 | Category | Examples | Instead |
 |---|---|---|
-| Internal audit logs and acceptance reports | "Console gap audit, 2026-10-15"; acceptance reports; gate reasoning | Move to the private ops repository. Public docs describe behavior only. |
-| Evidence dumps | Tables of checks, fixture results, raw command output with hashes | Summarize the outcome in the PR; keep raw evidence in the private ops repository. |
-| Gate and approval reasoning | Which draft PRs exist, what the owner approved, boundary notes | Keep in the PR or the private ops repository, not in `docs/`. |
+| Disposable internal task reports | Progress snapshots, handoffs, per-round task reports, acceptance reports that only track internal work | Keep in the private ops repository or an ignored local path. Versioned research baselines, decisions, contracts and required evidence are different; see below. |
+| Raw evidence dumps and private data | Account exports, raw command output with secrets, credential material | Keep raw and private material in approved protected storage. Commit only sanitized evidence that a project requirement calls for. |
+| Private approval reasoning and draft-PR status | Which draft PRs exist, who approved what internally, boundary notes | Keep in the PR or the private ops repository. A decision record may state the decision and its rationale without exposing private approval detail. |
 | Task scope notes | "this round", "in this task", undefined phase codes such as P0-P6 or T06 | Remove. If a concept is public, define it plainly in `docs/ARCHITECTURE.md`. |
 | Agent or job identifiers | Job IDs, runner names, agent names, which agent ran what | Remove. Irrelevant to outside readers. |
 | Owner approvals | "approved by <maintainer>" | Remove from public docs; record in the PR if needed. |
@@ -166,13 +160,23 @@ None of the following belongs in a public repository, whether in README files, `
 | Personal infrastructure | Real bucket names, cloud project IDs, `workers.dev` subdomains, home paths | Use `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. |
 | Private secrets or token names | Secret names tied to a private deployment, token mount paths | Use a generic placeholder such as `BROKER_API_KEY`. |
 | Unqualified performance claims | Real P&L or returns without method and disclaimer | Include method, period, and the disclaimer, or omit. |
-| Dated status banners | "2026-09-08 source check: merged; acceptance pending" | Replace with a present-tense status sentence, or remove. |
+| Dated status banners in a README | "2026-09-08 source check: merged; acceptance pending" | Replace with a present-tense status sentence, or remove. Dated evidence records are separate. |
+
+Some records are evidence rather than disposable process output. When a project requirement calls for them, sanitized versions may be versioned in the repository:
+
+- research baselines and frozen result sets
+- architecture and design decisions, including ADRs
+- financial and accounting contracts; runtime financial records stay in approved protected storage
+- data provenance, point-in-time and license evidence
+- security and incident records the project must retain
+
+Version these deliberately, with the context a future reader needs. Do not delete a file because its name contains a date or a word such as `report`; review its content and consumers first. Runtime financial records, raw private data, credentials and account-identifying exports stay in approved protected storage, not Git.
 
 If the content is useful internally, move it to a private location. Removing it from the current tree does not remove it from git history; see section 14.
 
 ## 6. Where internal notes go
 
-Internal notes do not belong in a public repository. Keep them in the private ops repository, or in a local folder outside any repository. If a note has to live in the working tree, put it in an ignored path and never commit it.
+Disposable internal notes do not belong in a public repository. Keep them in the private ops repository, in approved protected storage, or in a local folder outside any repository. If a note has to live in the working tree, put it in an ignored path and never commit it.
 
 ```gitignore
 .local/
@@ -181,7 +185,7 @@ ops-notes/
 *.internal.md
 ```
 
-Public docs describe behavior, not history. History goes to `CHANGELOG.md` and pull requests. Dated reports, evidence tables, and approval reasoning go to the private ops repository. Worktree and absolute local paths never appear in committed files.
+Reader-facing docs describe behavior, not the history of internal work. History goes to `CHANGELOG.md`, release notes and pull requests. Dated reports, raw evidence tables and approval reasoning go to the private ops repository. Sanitized evidence and decisions that a project requirement says to retain may be versioned; see section 5. Worktree and absolute local paths never appear in committed files.
 
 ## 7. docs/ layout and naming
 
@@ -213,7 +217,7 @@ Leave internal review dates and approval names out of an ADR. When a decision is
 
 ## 8. CHANGELOG format
 
-Follow Keep a Changelog. The file is `CHANGELOG.md`, with the unreleased section at the top. Use these sections, in this order, only when they have entries: Added, Changed, Fixed, Removed, Security.
+When a repository keeps a changelog, follow Keep a Changelog. The file is `CHANGELOG.md`, with the unreleased section at the top. A changelog is useful for released software but is not mandatory for every repository. Use these sections, in this order, only when they have entries: Added, Changed, Fixed, Removed, Security.
 
 - Write entries for users, not maintainers. Describe the observable change.
 - Link pull requests here when useful. This is the only place PR numbers belong in public docs.
@@ -235,7 +239,7 @@ Follow Keep a Changelog. The file is `CHANGELOG.md`, with the unreleased section
 
 ## 9. Pull request descriptions and commits
 
-Write PR descriptions in English. Fill every section of this template; write "none" where a section does not apply.
+Write PR descriptions in English. Use the repository's template and keep the sections that apply; write "none" where a section of the template does not apply.
 
 ```markdown
 ## Summary
@@ -462,18 +466,18 @@ The date banner, the merge status, and the PR number are gone. Status is a prese
 
 Apply this to any documentation PR.
 
-- [ ] README follows the section 3 structure for its repository type.
+- [ ] README covers what a reader needs; the section 3 outline is a default, not a required template.
 - [ ] Where relevant, one disclaimer appears near the top, not repeated.
 - [ ] No banned marketing words or filler phrases.
 - [ ] No emoji in headings, prose, or tables.
-- [ ] No dated status banners, audit titles, or acceptance titles.
-- [ ] No evidence tables, gate reasoning, approvals, or task-scope notes.
+- [ ] No dated status banners in reader-facing docs; dated evidence lives in its own retained record.
+- [ ] No disposable task reports, raw evidence dumps, private approvals or task-scope notes in reader-facing docs. Sanitized required evidence is versioned separately.
 - [ ] No PR-number status tables and no CI head SHAs in prose.
 - [ ] No real bucket, project, domain, account, or home-path identifiers; placeholders used.
 - [ ] No secret names tied to a private deployment.
 - [ ] Where relevant, configuration is presented as a table with required and default columns.
-- [ ] `README.md` and `README.zh-CN.md` both exist and are updated together in the same PR.
-- [ ] New documents are in English unless there is a clear reason otherwise.
+- [ ] Existing translations are updated with the source, or marked as behind.
+- [ ] New documents follow the project's audience and language convention; developer docs default to English.
 - [ ] Links resolve and point to files that exist.
 - [ ] Code comments avoid ticket, job, and round references.
 - [ ] UI strings are in locale files and describe state and next action.
@@ -485,7 +489,7 @@ Grep list to run before review. Treat a match as a prompt to check, not a certai
 - Personal subdomains: `rg 'workers\.dev'`
 - 40-character hex strings in prose: `rg '\b[0-9a-f]{40}\b'`
 - Status tables: `rg '\|\s*(PR|#\d+)'`
-- Dated audit titles: `rg -i '(audit|acceptance).*20[0-9]{2}-[0-9]{2}-[0-9]{2}'`
+- Dated titles in reader-facing docs (a prompt only; dated evidence records are legitimate): `rg -i '(audit|acceptance).*20[0-9]{2}-[0-9]{2}-[0-9]{2}'`
 - Process narration: `rg -i 'this round|the owner approved'`
 
 ## 14. Applying the guide to an existing repository
@@ -493,9 +497,9 @@ Grep list to run before review. Treat a match as a prompt to check, not a certai
 Apply the guide one repository at a time, as a single documentation-only PR. Move private content to a private location rather than deleting it, so nothing is lost. Removing text from the current tree does not remove it from git history; rewriting history is out of scope and needs separate, explicit authorization.
 
 1. Move private content out of the public tree to a private location.
-2. Align `README.md` and `README.zh-CN.md` to the skeleton in section 3.
+2. Review the README against section 3 and adapt it where that helps the reader; do not rewrite a working README only to match headings.
 3. Move stray docs into `docs/` with kebab-case names.
-4. Remove banned content per section 5.
+4. Move disposable internal content out per section 5, and keep sanitized evidence the project requires.
 5. Replace real identifiers with placeholders or a config reference.
 6. Add `CHANGELOG.md` entries if relevant.
 7. Run the section 13 grep list.
