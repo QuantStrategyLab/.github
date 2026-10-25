@@ -12,7 +12,8 @@ Organization-wide files for QuantStrategyLab repositories.
 | `docs/advisory-research-boundary.md` | Boundary between advisory research and trading projects. |
 | `profile/README.md` | Text shown on the organization's GitHub profile page. |
 | `PULL_REQUEST_TEMPLATE.md` | Default pull request template for repositories without their own. |
+| `AGENTS.md` | AI contribution and maintenance rules for this repository. |
 
 ## Contributing
 
-Open a pull request. Describe the problem, the change, and the effect on existing repositories.
+Open a pull request. Describe the problem, the change, and the effect on existing repositories. AI assistants and maintainers follow [AGENTS.md](AGENTS.md).
