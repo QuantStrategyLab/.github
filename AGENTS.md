@@ -32,6 +32,8 @@ contents table matches the files present.
 Changes to the style guide affect every public repository. State the effect on
 existing repositories in the pull request.
 
+Organization documentation rules are checked by `python scripts/check_style.py`, which also runs in CI as the `Documentation check` job.
+
 ## Naming and documentation
 
 - Developer documentation is English by default; Chinese siblings use
