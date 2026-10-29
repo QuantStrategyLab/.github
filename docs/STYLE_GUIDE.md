@@ -198,12 +198,13 @@ docs/
   GLOSSARY.md           terms and definitions
   adr/                  architecture decision records
   guides/               task-oriented how-to documents
+  research/             dated research and evidence records
   <name>.zh-CN.md       optional translation sibling
 ```
 
 - Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional documentation names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`, `STYLE_GUIDE`.
-- No dates in file names, except ADRs, which use a sequence number.
-- ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`. Number them sequentially; never reuse or renumber one.
+- No dates in file names, except under `docs/research/`. A date goes stale when it names something that keeps changing, which is why it is banned elsewhere. A research record does not keep changing: it is a snapshot of one date, and two analyses of the same subject from different months are different documents. Dropping the date leaves them competing for one name.
+- ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`. Number them sequentially; never reuse or renumber one. They are the other kind of record, and a sequence number identifies them better than a date.
 
 Write an ADR when a decision is hard to reverse, affects more than one repository, or changes a public interface. Each ADR states context, decision, and consequences, and carries a status on the first line after the title:
 
