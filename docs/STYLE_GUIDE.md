@@ -275,8 +275,21 @@ Commit messages:
 
 - Imperative mood: "add order preview", not "added" or "adds".
 - Subject of 72 characters or fewer.
-- Conventional Commits prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+- Conventional Commits prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`.
 - A body when the change needs context. No task codes or round numbers.
+
+Sentence-case subjects are allowed; commitlint ignores merge commits.
+
+AI-authored PRs identify the tool and the model when available. Labels and risk
+summaries use professional English. Use `risk:low` for documentation, tests and
+ordinary checks; use `risk:high` and `needs-owner-approval` for protected paths.
+The path-based `risk-gate` determines whether owner approval is required;
+classification labels cannot override it.
+
+Development uses required automated checks, template validation and independent
+AI review when available, with zero required human or code-owner approvals.
+High-risk paths wait for the owner's `owner-approved` label. AI agents must never
+add or remove that label. Existing required checks and protections still apply.
 
 ## 10. Code comments and docstrings
 
