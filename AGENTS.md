@@ -63,6 +63,8 @@ Organization documentation rules are checked by `python scripts/check_style.py`,
 
 ## Do not
 
+- Only the owner, or a reviewer explicitly authorized by the owner, may apply the `owner-approved` label; coding agents must never apply it to their own PRs.
+
 - Do not assume this file applies to other repositories; each repository carries
   its own `AGENTS.md` and `.github/engineering.md`.
 - Do not add organization-wide automation or branch-protection policy here.
