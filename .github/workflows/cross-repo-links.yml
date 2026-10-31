@@ -1,0 +1,120 @@
+name: Cross-repository links
+
+# Why this is a schedule and not a pull-request check: a workflow's
+# GITHUB_TOKEN is scoped to the repository it runs in, so a job inside
+# `QuantAIService` cannot read a file in `QuantPlatformKit`. Resolving a link
+# into a sibling needs a checkout of that sibling, which only a job that clones
+# the whole organisation can have. The cost is that a rename surfaces a day
+# later instead of at review time.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: cross-repo-links
+  cancel-in-progress: false
+
+env:
+  ORG: QuantStrategyLab
+
+jobs:
+  links:
+    name: Cross-repository links
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # The organisation's repositories are public, so this clones them without
+      # a credential. Cloning with the workflow token would work too, and would
+      # also mean a token leak in one repository reaches all of them; a check
+      # that only reads public content does not need that.
+      - name: Clone the organisation
+        env:
+          GIT_TERMINAL_PROMPT: "0"
+        run: |
+          set -euo pipefail
+          org_dir="$RUNNER_TEMP/org"
+          mkdir -p "$org_dir"
+          page=1
+          : > "$RUNNER_TEMP/repos.txt"
+          while :; do
+            body=$(curl -sSf "https://api.github.com/orgs/$ORG/repos?per_page=100&page=$page")
+            [ "$(printf '%s' "$body" | jq 'length')" -eq 0 ] && break
+            printf '%s' "$body" | jq -r '.[] | select(.archived | not) | .name' >> "$RUNNER_TEMP/repos.txt"
+            page=$((page + 1))
+          done
+          sort -u -o "$RUNNER_TEMP/repos.txt" "$RUNNER_TEMP/repos.txt"
+          echo "cloning $(wc -l < "$RUNNER_TEMP/repos.txt") repositories"
+          while read -r name; do
+            git clone --quiet --depth 1 "https://github.com/$ORG/$name.git" "$org_dir/$name"
+          done < "$RUNNER_TEMP/repos.txt"
+          ls "$org_dir"
+
+      # The exit status is captured rather than allowed to fail the step, so
+      # that the issue is opened before the run goes red. A run that fails
+      # without leaving a record is a run nobody reads.
+      - name: Check cross-repository links
+        id: check
+        run: |
+          set +e
+          python3 scripts/check_cross_repo_links.py \
+            --org quantstrategylab --root "$RUNNER_TEMP/org" \
+            > "$RUNNER_TEMP/report.txt" 2>&1
+          status=$?
+          cat "$RUNNER_TEMP/report.txt"
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+
+      - name: Open or close the issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          STATUS: ${{ steps.check.outputs.status }}
+        run: |
+          set -euo pipefail
+          title="Cross-repository links do not resolve"
+          existing=$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "in:title \"$title\"" --json number --jq '.[0].number // empty')
+
+          if [ "$STATUS" = "0" ]; then
+            if [ -n "$existing" ]; then
+              gh issue close "$existing" --repo "$GITHUB_REPOSITORY" \
+                --comment "Every link resolves again as of $(date -u +%Y-%m-%dT%H:%MZ)."
+            fi
+            exit 0
+          fi
+
+          {
+            echo "A link in one repository points at a path that does not exist on"
+            echo "the default branch of another. Renaming a file is a one-line"
+            echo "change in the repository that owns it and a broken link in every"
+            echo "repository that references it, which is why the in-repository"
+            echo "checker skips these and this job exists."
+            echo
+            echo "Run date: $(date -u +%Y-%m-%dT%H:%MZ)"
+            echo
+            echo '```'
+            cat "$RUNNER_TEMP/report.txt"
+            echo '```'
+          } > "$RUNNER_TEMP/body.md"
+
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/body.md"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body-file "$RUNNER_TEMP/body.md"
+          fi
+
+      - name: Fail when links are broken
+        if: steps.check.outputs.status != '0'
+        run: exit 1
