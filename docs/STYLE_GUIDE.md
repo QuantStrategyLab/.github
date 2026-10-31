@@ -26,9 +26,9 @@ Write plainly. Short sentences, one idea each. Explain a term the first time it 
 
 Habits to avoid:
 
-- Marketing adjectives: *powerful*, *seamless*, *robust*, *cutting-edge*, *comprehensive*, *world-class*, *next-generation*.
-- Filler openings: *It is worth noting*, *In summary*, *Let's dive in*, *Needless to say*.
-- Unnecessary process narration in reader-facing text: *this round*, *in this PR we*, *the owner approved*, *as agreed*.
+- Marketing adjectives: `seamless`, `cutting-edge`, `comprehensive`, `world-class`, `next-generation`, `state-of-the-art`, `best-in-class`. `robust` and `powerful` are not on the list: both are terms of art in statistics, and a rule that flagged them reported twelve non-defects in the research notes.
+- Filler openings: `It is worth noting`, `In summary`, `Let's dive in`, `Needless to say`.
+- Unnecessary process narration in reader-facing text: `this round`, `in this PR we`, `the owner approved`, `as agreed`.
 - Stacked qualifiers. If a sentence needs several to stay true, split it in two.
 - Emoji in headings, prose, or tables.
 
@@ -151,9 +151,9 @@ The following belongs outside public repositories, whether it would appear in RE
 | Disposable internal task reports | Progress snapshots, handoffs, per-round task reports, acceptance reports that only track internal work | Keep in the private ops repository or an ignored local path. Versioned research baselines, decisions, contracts and required evidence are different; see below. |
 | Raw evidence dumps and private data | Account exports, raw command output with secrets, credential material | Keep raw and private material in approved protected storage. Commit only sanitized evidence that a project requirement calls for. |
 | Private approval reasoning and draft-PR status | Which draft PRs exist, who approved what internally, boundary notes | Keep in the PR or the private ops repository. A decision record may state the decision and its rationale without exposing private approval detail. |
-| Task scope notes | "this round", "in this task", undefined phase codes such as P0-P6 or T06 | Remove. If a concept is public, define it plainly in `docs/ARCHITECTURE.md`. |
+| Task scope notes | `this round`, `in this task`, undefined phase codes such as P0-P6 or T06 | Remove. If a concept is public, define it plainly in `docs/ARCHITECTURE.md`. |
 | Agent or job identifiers | Job IDs, runner names, agent names, which agent ran what | Remove. Irrelevant to outside readers. |
-| Owner approvals | "approved by <maintainer>" | Remove from public docs; record in the PR if needed. |
+| Owner approvals | `approved by <maintainer>` | Remove from public docs; record in the PR if needed. |
 | PR-number status tables | Tables listing a PR number per phase | Describe the capability, not the PR. Link PRs only in `CHANGELOG.md`. |
 | CI head SHAs | 40-character hex identifiers in prose | Leave out. CI status lives in the PR. |
 | Account or broker identities | Account numbers, login names, broker account labels | Remove. Never name a real account. |
