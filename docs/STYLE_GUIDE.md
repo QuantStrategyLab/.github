@@ -504,7 +504,8 @@ Apply the guide one repository at a time, as a single documentation-only PR. Mov
 5. Replace real identifiers with placeholders or a config reference.
 6. Add `CHANGELOG.md` entries if relevant.
 7. Run the section 13 grep list.
-8. Open one documentation-only PR.
+8. Confirm the repository ships the files its visibility implies. With a `LICENSE`, that means `CONTRIBUTING.md`, `SECURITY.md`, `CODE_OF_CONDUCT.md` and the issue / PR templates beside it. Without one, `SECURITY.md` alone is enough, because an unlicensed public repository is "all rights reserved" — a `CONTRIBUTING.md` inviting pull requests there contradicts the licence it does not have. Decide the licence first, then the rest.
+9. Open one documentation-only PR.
 
 ## 15. Adoption
 
