@@ -1,0 +1,5 @@
+{
+  "name": "Weekly all-branch Gitleaks scan",
+  "description": "Scan full history on all branches, including logs and state, each week.",
+  "iconName": "shield"
+}

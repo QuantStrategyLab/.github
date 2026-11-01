@@ -13,6 +13,7 @@ Organization-wide files for QuantStrategyLab repositories.
 | [Architecture](docs/architecture.md) | Repository responsibilities, dependency directions and existing compatibility tooling. |
 | [Architecture conventions](docs/architecture-conventions.md) | Guidance for configuration, interfaces, tests and documentation ownership. |
 | [Incremental architecture proposal](docs/adr/0001-incremental-architecture-boundaries.md) | Proposed approach to compatible refactoring and rollback. |
+| [Secret scanning](docs/secret-scanning.md) | Publication guard, PR check and weekly all-branch scan templates. |
 | `profile/README.md` | Text shown on the organization's GitHub profile page. |
 | `PULL_REQUEST_TEMPLATE.md` | Default pull request template for repositories without their own. |
 | `AGENTS.md` | AI contribution and maintenance rules for this repository. |

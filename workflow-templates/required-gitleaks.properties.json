@@ -1,0 +1,5 @@
+{
+  "name": "Required Gitleaks scan",
+  "description": "Scan pull requests and main pushes with shared, redacted secret rules.",
+  "iconName": "shield"
+}

@@ -1,0 +1,15 @@
+# Replace the shared ref with a reviewed full 40-character commit SHA before copying.
+name: Required secret scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    name: Secret scan
+    uses: QuantStrategyLab/.github/.github/workflows/gitleaks.yml@REPLACE_WITH_REVIEWED_SHARED_COMMIT_SHA
