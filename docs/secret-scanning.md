@@ -17,7 +17,7 @@ to publish; keep that data in approved private storage.
 ```yaml
 # Earlier steps produce publish/ and prepare the commit to publish.
 - name: Scan the publication directory
-  uses: QuantStrategyLab/.github/actions/scan-before-publish@b0a90eb9ac1cf06aef3c9c6c289b4cf7d833cca3
+  uses: QuantStrategyLab/.github/actions/scan-before-publish@0da4da68433b803cda17d3f84e29875a94a32273
   with:
     path: publish
 - name: Publish the already scanned commit to the data branch
@@ -28,7 +28,7 @@ For an artifact publisher:
 
 ```yaml
 - name: Scan the artifact directory
-  uses: QuantStrategyLab/.github/actions/scan-before-publish@b0a90eb9ac1cf06aef3c9c6c289b4cf7d833cca3
+  uses: QuantStrategyLab/.github/actions/scan-before-publish@0da4da68433b803cda17d3f84e29875a94a32273
   with:
     path: publish
 - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -119,7 +119,7 @@ permissions:
 jobs:
   secret-scan:
     name: Secret scan
-    uses: QuantStrategyLab/.github/.github/workflows/gitleaks.yml@724a7869fa972347a41d8e669ac7e505462696a9
+    uses: QuantStrategyLab/.github/.github/workflows/gitleaks.yml@0da4da68433b803cda17d3f84e29875a94a32273
     with:
       full-history: true
 ```

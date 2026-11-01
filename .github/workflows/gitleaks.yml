@@ -29,7 +29,7 @@ jobs:
         with:
           repository: QuantStrategyLab/.github
           # Pin the helper commit; changes to helpers require an explicit pin update.
-          ref: b0a90eb9ac1cf06aef3c9c6c289b4cf7d833cca3
+          ref: 0da4da68433b803cda17d3f84e29875a94a32273
           persist-credentials: false
           path: secret-scan-tools
       - name: Install checksum-verified Gitleaks
