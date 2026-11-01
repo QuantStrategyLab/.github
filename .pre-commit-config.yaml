@@ -3,4 +3,4 @@ repos:
     rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e # v8.30.1
     hooks:
       - id: gitleaks
-        args: [--redact]
+        args: [--redact, --config=.gitleaks.toml]

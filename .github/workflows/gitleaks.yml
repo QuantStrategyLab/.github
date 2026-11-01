@@ -1,0 +1,73 @@
+name: Shared Gitleaks scan
+
+on:
+  workflow_call:
+    inputs:
+      full-history:
+        description: Scan all fetched branches and their complete history
+        type: boolean
+        required: false
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out the caller with full history
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          path: source
+      - name: Check out trusted scanner and shared configuration
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          repository: QuantStrategyLab/.github
+          # Pin the helper commit; changes to helpers require an explicit pin update.
+          ref: b0a90eb9ac1cf06aef3c9c6c289b4cf7d833cca3
+          persist-credentials: false
+          path: secret-scan-tools
+      - name: Install checksum-verified Gitleaks
+        run: bash secret-scan-tools/scripts/install-gitleaks.sh "$RUNNER_TEMP/shared-gitleaks"
+      - name: Fetch every branch, including logs and state
+        if: inputs.full-history
+        working-directory: source
+        run: git fetch origin '+refs/heads/*:refs/remotes/origin/*'
+      - name: Scan with shared rules and redacted output
+        id: scan
+        shell: bash
+        env:
+          FULL_HISTORY: ${{ inputs.full-history }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BASE: ${{ github.event.before }}
+          PUSH_HEAD: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          log_opts=--all
+          if [[ "$FULL_HISTORY" != true ]]; then
+            base="${PR_BASE:-$PUSH_BASE}"
+            head="${PR_HEAD:-$PUSH_HEAD}"
+            if [[ -z "$base" || "$base" =~ ^0+$ || -z "$head" ]]; then
+              echo 'Missing comparison commits; refusing an incomplete scan' >&2
+              exit 2
+            fi
+            log_opts="$base..$head"
+          fi
+          python3 secret-scan-tools/scripts/scan-secrets.py git source \
+            --gitleaks "$RUNNER_TEMP/shared-gitleaks/gitleaks" \
+            --log-opts="$log_opts" \
+            --summary "$RUNNER_TEMP/gitleaks-summary/summary.json"
+      - name: Upload only the path and rule summary
+        if: ${{ !cancelled() && inputs.full-history && steps.scan.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gitleaks-history-summary-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/gitleaks-summary/summary.json
+          if-no-files-found: error
+          retention-days: 3
