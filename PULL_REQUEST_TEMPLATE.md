@@ -27,3 +27,7 @@
 
 - [ ] This PR follows the [documentation style guide](https://github.com/QuantStrategyLab/.github/blob/main/docs/STYLE_GUIDE.md).
 - [ ] Documentation-only changes say so in the Summary.
+
+## AI assistance
+
+Which AI tool and model were used? Write `None` if no AI was used.
