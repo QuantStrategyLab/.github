@@ -1,0 +1,34 @@
+name: Scan before publish
+description: Scan a publication directory with shared Gitleaks rules and safe output
+inputs:
+  path:
+    description: Existing file or directory to publish; relative to the workspace
+    required: true
+  config-path:
+    description: Optional configuration extending the shared rules; relative to the workspace
+    required: false
+    default: ''
+  fail-on-finding:
+    description: Fail on findings; false is for diagnostics and must not guard publication
+    required: false
+    default: 'true'
+runs:
+  using: composite
+  steps:
+    - name: Install checksum-verified Gitleaks
+      shell: bash
+      env:
+        ACTION_ROOT: ${{ github.action_path }}
+      run: bash "$ACTION_ROOT/../../scripts/install-gitleaks.sh" "$RUNNER_TEMP/publication-gitleaks"
+    - name: Scan publication content
+      shell: bash
+      env:
+        ACTION_ROOT: ${{ github.action_path }}
+        SCAN_PATH: ${{ inputs.path }}
+        CONFIG_PATH: ${{ inputs.config-path }}
+        FAIL_ON_FINDING: ${{ inputs.fail-on-finding }}
+      run: |
+        python3 "$ACTION_ROOT/../../scripts/scan-secrets.py" dir "$SCAN_PATH" \
+          --gitleaks "$RUNNER_TEMP/publication-gitleaks/gitleaks" \
+          --config-path "${CONFIG_PATH:-$ACTION_ROOT/../../.gitleaks.toml}" \
+          --fail-on-finding "$FAIL_ON_FINDING"
