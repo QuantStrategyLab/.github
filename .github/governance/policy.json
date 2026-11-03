@@ -3,7 +3,7 @@
   "mode": "SHADOW",
   "reviewers": [],
   "owners": [],
-  "codex_app_ids": [],
+  "codex_app_ids": [1144995],
   "max_evidence_age_hours": 24,
   "baseline_exceptions": false,
   "merge_authorized": false
