@@ -64,6 +64,15 @@ class NamingTest(CheckerTestCase):
         check_style.check_naming(self.root, report)
         self.assertTrue(any("underscores" in m for m in self.messages(report, "naming")))
 
+    def test_github_templates_keep_their_underscore(self):
+        # GitHub only reads pull_request_template.md / issue_template.md with the
+        # underscore; renaming them to hyphens disables the template.
+        self.write(".github/pull_request_template.md", "## Summary\n")
+        self.write(".github/issue_template.md", "---\nname: bug\n---\n")
+        report = self.report()
+        check_style.check_naming(self.root, report)
+        self.assertEqual(self.messages(report, "naming"), [])
+
     def test_date_is_flagged_outside_record_paths(self):
         self.write("docs/2026-10-30-release.md", "# x\n")
         report = self.report()
