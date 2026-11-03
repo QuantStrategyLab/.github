@@ -156,7 +156,15 @@ def subdomain_is_real(text: str, match: re.Match, ctx: FileContext) -> bool:
 
     What survives this predicate is a subdomain that was actually deployed,
     which is the thing the rule is about.
+
+    The fenced-block exemption is repeated here because `check_leaks` only
+    applies it to patterns without a predicate. Without this line, installing
+    the predicate would make an example that shows what to avoid start
+    reporting — a wider blocking set than the rule had before, which is not
+    what a narrowing fix should do.
     """
+    if not ctx.prose[match.start():match.end()].strip():
+        return False
     subdomain = match.group(0)[: -len(".workers.dev")]
     return not PLACEHOLDER_SUBDOMAIN.search(subdomain.lower())
 
