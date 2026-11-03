@@ -451,5 +451,50 @@ class VisibilityTest(CheckerTestCase):
         )
 
 
+
+
+class ExampleMentionTest(CheckerTestCase):
+    """Rules must not fire on text that is showing what not to do.
+
+    Both cases below came from real repositories: a reference page documenting
+    how to attach an image, and a design guide listing the filler words it
+    forbids. Each was blocked by the rule it was teaching the reader to obey.
+    """
+
+    def test_a_link_inside_inline_code_is_an_example(self):
+        self.write(
+            "docs/pr-attachments.md",
+            "# t\n\nReference it as `![alt](./settings-after.png)` to place it inline.\n",
+        )
+        report = self.report()
+        # The temporary directory is not resolved; check_links resolves the
+        # target, so an unresolved root would look like a sibling checkout.
+        check_style.check_links(self.root.resolve(), report)
+        self.assertEqual(self.messages(report, "links"), [])
+
+    def test_a_real_broken_link_is_still_reported(self):
+        self.write("docs/page.md", "# t\n\nSee [the settings](./settings-after.png).\n")
+        report = self.report()
+        check_style.check_links(self.root.resolve(), report)
+        self.assertEqual(len(self.messages(report, "links")), 1)
+
+    def test_a_quoted_word_list_is_not_marketing_language(self):
+        self.write(
+            "docs/design.md",
+            '# t\n\n* **NO filler verbs.** "Elevate", "Seamless", "Unleash"'
+            " \u2192 concrete verbs only.\n",
+        )
+        report = self.report()
+        check_style.check_language(self.root, report)
+        self.assertEqual(self.messages(report, "language"), [])
+
+    def test_one_quoted_word_is_still_a_claim(self):
+        # The exemption is about lists. A single quoted word is a word used.
+        self.write("docs/page.md", "# t\n\nOur 'Seamless' onboarding flow.\n")
+        report = self.report()
+        check_style.check_language(self.root, report)
+        self.assertEqual(len(self.messages(report, "language")), 1)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -385,7 +385,13 @@ def check_links(root: Path, report: Report) -> None:
     for path in iter_files(root):
         if not is_markdown(path):
             continue
-        text = strip_fenced_blocks(path.read_text(encoding="utf-8", errors="ignore"))
+        # A link written inside backticks is an example of how to write a link,
+        # not a link. `pr-attachments.md` documents `![alt](./shot.png)` so the
+        # reader can copy it; reporting that as a broken target makes the
+        # documentation of the feature impossible to pass the check.
+        text = blank_code_spans(
+            strip_fenced_blocks(path.read_text(encoding="utf-8", errors="ignore"))
+        )
         for match in re.finditer(r"\[[^\]]*\]\(([^)\s]+)\)", text):
             target = match.group(1)
             if target.startswith(("http://", "https://", "mailto:", "#", "<")):
@@ -467,6 +473,30 @@ def check_docs_baseline(root: Path, report: Report) -> None:
         )
 
 
+QUOTE_MARKS = "\"'\u201c\u201d\u2018\u2019"
+QUOTED_TERM = re.compile(r"[\"\'\u201c\u2018][^\"\'\u201c\u201d\u2018\u2019]{1,40}[\"\'\u201d\u2019]")
+
+
+def quoted_term_list(line: str, match: re.Match) -> bool:
+    """True when a banned word sits inside a list of quoted terms.
+
+    Section 2 forbids marketing words in prose. A guide that writes
+    "Elevate", "Seamless", "Unleash" is naming the words it forbids, and
+    reporting it makes the rule unusable exactly where it is most needed --
+    the same shape as the placeholder-subdomain and template-underscore
+    exemptions.
+
+    The condition is two or more quoted terms on the line, so one quoted word
+    used as a claim ("our 'seamless' onboarding") is still reported. That
+    keeps the exemption about lists, not about quotation marks.
+    """
+    before = line[match.start() - 1] if match.start() else ""
+    after = line[match.end()] if match.end() < len(line) else ""
+    if before not in QUOTE_MARKS or after not in QUOTE_MARKS:
+        return False
+    return len(QUOTED_TERM.findall(line)) >= 2
+
+
 def check_language(root: Path, report: Report) -> None:
     marketing = re.compile(
         r"\b(" + "|".join(re.escape(w) for w in MARKETING_WORDS) + r")\b", re.IGNORECASE
@@ -485,6 +515,8 @@ def check_language(root: Path, report: Report) -> None:
         first_heading = True
         for number, line in enumerate(text.splitlines(), 1):
             for match in marketing.finditer(line):
+                if quoted_term_list(line, match):
+                    continue
                 report.add("language", f"{rel}:{number}: marketing word '{match.group(0)}' (section 2)")
             for match in filler.finditer(line):
                 report.add("language", f"{rel}:{number}: filler phrase '{match.group(0)}' (section 2)")
