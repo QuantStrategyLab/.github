@@ -214,7 +214,7 @@ LEAK_PATTERNS = [
     (re.compile(r"\bgs://[^\s`)\]\"'<>]+"),
      "content", "non-placeholder bucket (section 13)", bucket_is_real),
     (re.compile(r"\b[\w-]+\.workers\.dev\b"),
-     "content", "personal subdomain (section 13)", subdomain_is_real),
+     "publish", "personal subdomain (section 13)", subdomain_is_real),
     (re.compile(r"\b[0-9a-f]{40}\b"),
      "content", "40-character hex string in prose (section 5)", hex_is_prose),
     # `| PR |` is a table header; `| PR #12 |` and `| #12 |` are the rows this
@@ -262,9 +262,19 @@ DATED_TITLE = re.compile(r"(audit|acceptance).*20\d{2}-\d{2}-\d{2}", re.IGNORECA
 # rest once the naming cleanup is done. README structure never blocks, because
 # section 3 is a default and section 4 says so.
 PHASE_BLOCKING = {
-    1: {"paths", "links", "agents", "hygiene"},
-    2: {"paths", "links", "agents", "hygiene", "content", "naming", "language", "docs"},
+    1: {"paths", "links", "agents", "hygiene", "publish"},
+    2: {"paths", "links", "agents", "hygiene", "publish", "content", "naming", "language", "docs"},
 }
+
+# Rules whose purpose is to stop an identifier being published.
+#
+# The style guide governs published documentation. In a private repository
+# nothing is published, and a deployment document may need the real host name to
+# be usable at all — an OAuth callback URL with a placeholder in it cannot be
+# configured. So these report as notes there and block in public repositories,
+# which is the case the rule was written for. The default stays "public", so
+# forgetting the flag cannot switch a leak rule off by accident.
+PUBLICATION_CATEGORIES = {"paths", "publish"}
 
 
 class Report:
@@ -575,10 +585,17 @@ def main(argv: list[str] | None = None) -> int:
         "--advisory", action="store_true",
         help="report findings but always exit 0, for adopting a repository gradually",
     )
+    parser.add_argument(
+        "--visibility", choices=("public", "private"), default="public",
+        help="private demotes publication rules to notes; default treats the repository as public",
+    )
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
-    report = Report(PHASE_BLOCKING[args.phase])
+    blocking_categories = set(PHASE_BLOCKING[args.phase])
+    if args.visibility == "private":
+        blocking_categories -= PUBLICATION_CATEGORIES
+    report = Report(blocking_categories)
 
     check_naming(root, report)
     check_readme(root, report)
@@ -599,9 +616,14 @@ def main(argv: list[str] | None = None) -> int:
 
     print()
     print(
-        f"phase {args.phase}: {len(blocking)} blocking, {len(advisory)} advisory. "
-        "Advisory findings become blocking in phase 2."
+        f"phase {args.phase} ({args.visibility}): {len(blocking)} blocking, "
+        f"{len(advisory)} advisory. Advisory findings become blocking in phase 2."
     )
+    if args.visibility == "private":
+        print(
+            "private repository: publication rules report as notes; "
+            "they would block if this repository were published"
+        )
     if args.advisory:
         # A repository adopts the rule set before it can satisfy it. Failing on
         # the adoption pull request would make that pull request the first thing

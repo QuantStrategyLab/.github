@@ -59,6 +59,11 @@ class CheckerTestCase(unittest.TestCase):
     def messages(self, report: check_style.Report, category: str) -> list[str]:
         return [m for c, m in report.findings if c == category]
 
+    def run_main(self, *extra: str) -> tuple[int, str]:
+        with redirect_stdout(io.StringIO()) as captured:
+            code = check_style.main(["--root", str(self.root), "--phase", "2", *extra])
+        return code, captured.getvalue()
+
 
 class NamingTest(CheckerTestCase):
     def test_underscore_is_flagged(self):
@@ -376,11 +381,6 @@ class AdvisoryModeTest(CheckerTestCase):
     the repository ends up with neither.
     """
 
-    def run_main(self, *extra: str) -> tuple[int, str]:
-        with redirect_stdout(io.StringIO()) as captured:
-            code = check_style.main(["--root", str(self.root), "--phase", "2", *extra])
-        return code, captured.getvalue()
-
     def test_advisory_reports_the_findings_it_would_have_blocked_on(self):
         self.write("docs/hk_equity_runtime.md", "# x\n")
         code, output = self.run_main("--advisory")
@@ -392,6 +392,63 @@ class AdvisoryModeTest(CheckerTestCase):
         self.write("docs/hk_equity_runtime.md", "# x\n")
         code, _ = self.run_main()
         self.assertEqual(code, 1)
+
+
+class VisibilityTest(CheckerTestCase):
+    """The publication rules govern publishing, not existence.
+
+    A private repository publishes nothing, and a deployment document may need
+    the real host name to be usable — an OAuth callback URL with a placeholder
+    in it cannot be configured. Blocking there would force a document to be
+    wrong in order to pass.
+    """
+
+    def deploy_doc(self) -> None:
+        self.write(
+            "docs/deployment.md",
+            "Callback: https://invoice.pigbibi.workers.dev/auth/github/callback\n"
+            "Data lives in /home/ubuntu/app/data.\n",
+        )
+
+    def test_public_repository_blocks_published_identifiers(self):
+        self.deploy_doc()
+        _, output = self.run_main("--visibility", "public")
+        self.assertTrue(
+            any(line.startswith("ERROR") and "personal subdomain" in line
+                for line in output.splitlines())
+        )
+
+    def test_private_repository_reports_them_without_blocking(self):
+        self.deploy_doc()
+        _, output = self.run_main("--visibility", "private")
+        self.assertFalse(
+            any(line.startswith("ERROR") and "personal subdomain" in line
+                for line in output.splitlines())
+        )
+        self.assertTrue(
+            any(line.startswith("NOTE") and "personal subdomain" in line
+                for line in output.splitlines())
+        )
+        self.assertIn("private repository", output)
+
+    def test_the_default_is_public(self):
+        # Forgetting the flag must not switch a leak rule off.
+        self.deploy_doc()
+        _, output = self.run_main()
+        self.assertIn("(public)", output)
+        self.assertTrue(
+            any(line.startswith("ERROR") and "personal subdomain" in line
+                for line in output.splitlines())
+        )
+
+    def test_private_still_blocks_a_missing_security_policy(self):
+        # Visibility narrows the publication rules only; it is not a blanket
+        # exemption for everything the checker knows.
+        _, output = self.run_main("--visibility", "private")
+        self.assertTrue(
+            any(line.startswith("ERROR") and "SECURITY.md" in line
+                for line in output.splitlines())
+        )
 
 
 if __name__ == "__main__":

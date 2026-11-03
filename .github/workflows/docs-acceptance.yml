@@ -74,8 +74,12 @@ jobs:
       - name: Check documentation rules
         env:
           MODE: ${{ inputs.mode }}
+          # A private repository publishes nothing, so the rules that exist to
+          # stop an identifier being published report as notes there. A
+          # deployment document may need the real host name to be usable.
+          VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
         run: |
-          args="--root target --phase 2"
+          args="--root target --phase 2 --visibility $VISIBILITY"
           if [ "$MODE" = "advisory" ]; then
             args="$args --advisory"
           fi
@@ -89,6 +93,7 @@ jobs:
         env:
           MODE: ${{ inputs.mode }}
           REVISION: ${{ inputs.policy-revision }}
+          VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
         run: |
           {
             echo "## Documentation rules"
@@ -96,7 +101,13 @@ jobs:
             echo "- Rule set: https://github.com/QuantStrategyLab/.github/blob/${REVISION}/docs/STYLE_GUIDE.md"
             echo "- Checker: https://github.com/QuantStrategyLab/.github/blob/${REVISION}/scripts/check_style.py"
             echo "- Mode: \`${MODE}\`"
+            echo "- Repository: \`${VISIBILITY}\`"
             echo
+            if [ "$VISIBILITY" = "private" ]; then
+              echo "This repository is private, so rules about publishing real host"
+              echo "names, buckets and home paths report as notes instead of failing."
+              echo
+            fi
             if [ "$MODE" = "advisory" ]; then
               echo "Findings are reported but do not fail this job yet. Fixing them"
               echo "is what lets this repository move to \`enforce\`."
