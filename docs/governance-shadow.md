@@ -39,6 +39,8 @@ Newer invalid or revoked bound records dominate older approvals. No label or
 provider availability supplies authorization. Default identity lists are empty,
 so R1/R2 observations remain pending until a separately reviewed source policy
 establishes identities. No identities or settings are provisioned by this pilot.
+An unresolved change request survives comment-only reviews and can be cleared
+only by a valid later approval from that reviewer or dismissal of the request.
 
 An optional `codex_app_ids` list enables a separate observation of the native
 Codex summary comment. The source must be a bot posted through a configured
@@ -46,6 +48,7 @@ GitHub App and its review state must name the current head. The observation
 distinguishes running, stale, malformed and unresolved findings. An empty list
 leaves this observation unconfigured. This signal does not establish full
 coverage or base binding, does not accept a review, and never authorizes merge.
+Multiple receipt blocks in one comment are ambiguous and reported as unknown.
 
 The final read compares the candidate and evidence with the initial reads.
 Failures produce UNKNOWN and a failed, non-required observation job. Reports use

@@ -84,6 +84,16 @@ test('A malformed newer native receipt cannot revive an older clean receipt', as
   f.evidence.comments.push({...entry, id: 12, updated_at: 'invalid'});
   assert.equal((await observe(f)).report.codex_observation, 'UNKNOWN');
 });
+for (const duplicate of ['unresolved', 'malformed']) {
+  test(`Duplicate Codex receipt blocks an ambiguous observation: ${duplicate}`, async () => {
+    const {f, entry, record} = codexFixture();
+    record.code_review.has_unresolved_findings = true;
+    entry.body += duplicate === 'unresolved'
+      ? `\n<!-- codex-review-state:v1 ${JSON.stringify(record)} -->`
+      : '\n<!-- codex-review-state:v1 {bad} -->';
+    assert.equal((await observe(f)).report.codex_observation, 'UNKNOWN');
+  });
+}
 for (const filename of ['.github/workflows/example.yml', 'tests/example.js', 'docs/acceptance-policy.md', 'AGENTS.md']) {
   test(`Sensitive scope is R2: ${filename}`, async () => {
     const f = fixture(); f.files[0].filename = filename;
@@ -171,6 +181,41 @@ test('An unresolved concrete defect cannot be erased by another reviewer approva
   f.evidence.reviews.push({...f.evidence.reviews[0], id: 2, state: 'CHANGES_REQUESTED',
     body: JSON.stringify({...record, findings: [{severity: 'defect'}]})});
   f.evidence.reviews.push({...f.evidence.reviews[0], id: 3, user: {login: '<PROJECT_ID>-other', type: 'User'}});
+  assert.equal((await observe(f)).report.observation, 'PENDING_REVIEW');
+});
+test('A comment-only review does not clear a prior change request', async () => {
+  const {f, record} = await recordFixture();
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 2, state: 'CHANGES_REQUESTED'});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 3, state: 'COMMENTED', body: 'Follow-up comment'});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 4, user: {login: '<PROJECT_ID>-other', type: 'User'},
+    body: JSON.stringify(record)});
+  const {report} = await observe(f);
+  assert.equal(report.independent_review, false);
+  assert.equal(report.observation, 'PENDING_REVIEW');
+});
+test('A valid later approval by the requesting reviewer clears the request', async () => {
+  const {f} = await recordFixture();
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 2, state: 'CHANGES_REQUESTED'});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 3, state: 'COMMENTED', body: 'Follow-up'});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 4});
+  const {report} = await observe(f);
+  assert.equal(report.independent_review, true);
+  assert.equal(report.observation, 'PENDING_OWNER');
+});
+test('A dismissed change request no longer blocks an independent approval', async () => {
+  const {f} = await recordFixture();
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 2, state: 'DISMISSED'});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 3,
+    user: {login: '<PROJECT_ID>-other', type: 'User'}});
+  assert.equal((await observe(f)).report.observation, 'PENDING_OWNER');
+});
+test('An expired approval cannot clear a prior change request', async () => {
+  const {f, record} = await recordFixture();
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 2, state: 'CHANGES_REQUESTED'});
+  record.expires_at = new Date(Date.now() - 1000).toISOString();
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 3, body: JSON.stringify(record)});
+  f.evidence.reviews.push({...f.evidence.reviews[0], id: 4,
+    user: {login: '<PROJECT_ID>-other', type: 'User'}});
   assert.equal((await observe(f)).report.observation, 'PENDING_REVIEW');
 });
 test('Parallel observations do not share mutable decisions', async () => {

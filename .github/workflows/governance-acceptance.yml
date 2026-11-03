@@ -123,6 +123,7 @@ jobs:
                     || !Number.isFinite(Date.parse(entry.updated_at)))) return 'UNKNOWN';
                 candidates.sort((a, b) => Date.parse(b.updated_at || '') - Date.parse(a.updated_at || '') || b.id - a.id);
                 if (!candidates.length) return 'NOT_FOUND';
+                if ((candidates[0].body.match(/codex-review-state:v1/g) || []).length !== 1) return 'UNKNOWN';
                 const match = /<!-- codex-review-state:v1 (\{[^\n]*\}) -->/.exec(candidates[0].body);
                 if (!match) return 'UNKNOWN';
                 let review;
@@ -163,20 +164,26 @@ jobs:
                 candidates.sort((a,b) => b.id - a.id);
                 return candidates[0]?.valid === true && candidates[0]?.decision === 'approve';
               }
-              const latestReviews = new Map();
+              const unresolvedByReviewer = new Map();
               for (const review of [...evidence.reviews].sort((a,b) => a.id - b.id)) {
-                if (review.user?.type === 'User' && policy.reviewers.includes(review.user.login)
-                    && review.user.login !== pr.user.login && review.commit_id === pr.head.sha)
-                  latestReviews.set(review.user.login, review);
+                if (review.user?.type !== 'User' || !policy.reviewers.includes(review.user.login)
+                    || review.user.login === pr.user.login || review.commit_id !== pr.head.sha
+                    || review.state === 'DISMISSED') continue;
+                const reviewer = review.user.login;
+                if (review.state === 'CHANGES_REQUESTED') {
+                  unresolvedByReviewer.set(reviewer, true);
+                } else if (review.state === 'APPROVED' && decision('review', [review], policy.reviewers)) {
+                  unresolvedByReviewer.set(reviewer, false);
+                } else {
+                  try {
+                    const record = JSON.parse(review.body);
+                    if (record.head === pr.head.sha && record.base === pr.base.sha && record.scope === scope
+                        && record.policy === policyDigest && !findingsClear(record.findings))
+                      unresolvedByReviewer.set(reviewer, true);
+                  } catch { /* A comment without a record cannot clear a change request. */ }
+                }
               }
-              const unresolved = [...latestReviews.values()].some(review => {
-                if (review.state === 'CHANGES_REQUESTED') return true;
-                try {
-                  const record = JSON.parse(review.body);
-                  return record.head === pr.head.sha && record.base === pr.base.sha && record.scope === scope
-                    && record.policy === policyDigest && !findingsClear(record.findings);
-                } catch { return false; }
-              });
+              const unresolved = [...unresolvedByReviewer.values()].some(Boolean);
               const reviewed = !unresolved && decision('review', evidence.reviews, policy.reviewers);
               const owned = decision('owner', evidence.comments, policy.owners);
               const currentEvidence = await readEvidence();
