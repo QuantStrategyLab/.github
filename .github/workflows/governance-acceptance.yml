@@ -52,6 +52,8 @@ jobs:
               if (policy.schema_version !== 1 || policy.mode !== 'SHADOW' || policy.merge_authorized !== false
                   || policy.baseline_exceptions !== false || !Array.isArray(policy.reviewers)
                   || !Array.isArray(policy.owners) || ![...policy.reviewers, ...policy.owners].every(x => typeof x === 'string')
+                  || !Array.isArray(policy.codex_app_ids)
+                  || !policy.codex_app_ids.every(x => Number.isSafeInteger(x) && x > 0)
                   || !Number.isInteger(policy.max_evidence_age_hours)
                   || policy.max_evidence_age_hours < 1 || policy.max_evidence_age_hours > 24) fail('INVALID_POLICY');
               const policyDigest = digest(policy);
@@ -112,6 +114,26 @@ jobs:
                 && f.status === 'added' && f.deletions === 0 && !/[<`\[\]{}]|https?:|\bmust\b|\bshall\b|\brequir|必须|应当/i.test(f.patch));
               const tier = isR2 ? 'R2' : proseOnly ? 'R0' : 'R1';
               const evidence = await readEvidence();
+              function codexObservation(comments) {
+                if (policy.codex_app_ids.length === 0) return 'NOT_CONFIGURED';
+                const candidates = comments.filter(entry => entry.user?.type === 'Bot'
+                  && policy.codex_app_ids.includes(entry.performed_via_github_app?.id)
+                  && typeof entry.body === 'string' && entry.body.includes('codex-review-state:v1'));
+                if (candidates.some(entry => !Number.isSafeInteger(entry.id)
+                    || !Number.isFinite(Date.parse(entry.updated_at)))) return 'UNKNOWN';
+                candidates.sort((a, b) => Date.parse(b.updated_at || '') - Date.parse(a.updated_at || '') || b.id - a.id);
+                if (!candidates.length) return 'NOT_FOUND';
+                const match = /<!-- codex-review-state:v1 (\{[^\n]*\}) -->/.exec(candidates[0].body);
+                if (!match) return 'UNKNOWN';
+                let review;
+                try { review = JSON.parse(match[1]).code_review; } catch { return 'UNKNOWN'; }
+                if (!review || review.commit_sha !== pr.head.sha) return 'STALE_OR_UNKNOWN';
+                if (review.status === 'running') return 'IN_PROGRESS';
+                if (review.status !== 'completed' || typeof review.has_any_findings !== 'boolean'
+                    || typeof review.has_unresolved_findings !== 'boolean') return 'UNKNOWN';
+                return review.has_unresolved_findings ? 'UNRESOLVED_FINDINGS'
+                  : review.has_any_findings ? 'FINDINGS_REPORTED' : 'NO_REPORTED_FINDINGS';
+              }
               const now = Date.now();
               const findingsClear = findings => Array.isArray(findings) && findings.every(finding =>
                 finding && (finding.kind === 'advisory' || (finding.kind === 'defect'
@@ -166,7 +188,8 @@ jobs:
                   : tier === 'R2' && !owned ? 'PENDING_OWNER' : 'EVIDENCE_PRESENT',
                 reason: 'SHADOW_ONLY', independent_review: reviewed, owner_approval: owned,
                 semantic_classification: 'HEURISTIC_NOT_ACCEPTANCE', required_checks: 'NOT_EVALUATED',
-                event_freshness: 'SNAPSHOT_ONLY', baseline_exception: 'UNSUPPORTED'};
+                event_freshness: 'SNAPSHOT_ONLY', baseline_exception: 'UNSUPPORTED',
+                codex_observation: codexObservation(evidence.comments)};
             } catch {
               // Deliberately omit exception text, paths, patches, user bodies and API response data.
               report = {...report, observation: 'UNKNOWN', reason: 'READ_OR_INTEGRITY_FAILURE'};

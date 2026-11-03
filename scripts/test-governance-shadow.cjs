@@ -41,6 +41,49 @@ test('Ordinary code needs independent review', async () => {
   const f = fixture(); f.files[0].filename = 'src/example.js';
   assert.equal((await observe(f)).report.observation, 'PENDING_REVIEW');
 });
+function codexFixture() {
+  const f = fixture(); f.files[0].filename = 'src/example.js'; f.policy.codex_app_ids = [12345];
+  const record = {code_review: {commit_sha: H, status: 'completed',
+    has_any_findings: false, has_unresolved_findings: false}};
+  const entry = {id: 11, user: {type: 'Bot'}, performed_via_github_app: {id: 12345},
+    updated_at: new Date().toISOString(), body: `<!-- codex-review-state:v1 ${JSON.stringify(record)} -->`};
+  f.evidence.comments = [entry];
+  return {f, entry, record};
+}
+test('Codex current-head receipt is observation only, never approval', async () => {
+  const {f} = codexFixture(); const {report} = await observe(f);
+  assert.equal(report.codex_observation, 'NO_REPORTED_FINDINGS');
+  assert.equal(report.observation, 'PENDING_REVIEW');
+  assert.equal(report.independent_review, false);
+});
+for (const [mutation, expected] of [['stale', 'STALE_OR_UNKNOWN'], ['running', 'IN_PROGRESS'],
+  ['unresolved', 'UNRESOLVED_FINDINGS'], ['resolved', 'FINDINGS_REPORTED'],
+  ['malformed', 'UNKNOWN'], ['untrusted', 'NOT_FOUND'], ['user', 'NOT_FOUND'], ['timestamp', 'UNKNOWN']]) {
+  test(`Codex receipt preserves untrusted or incomplete state: ${mutation}`, async () => {
+    const {f, entry, record} = codexFixture();
+    if (mutation === 'stale') record.code_review.commit_sha = 'd'.repeat(40);
+    if (mutation === 'running') record.code_review.status = 'running';
+    if (mutation === 'unresolved') record.code_review.has_unresolved_findings = true;
+    if (mutation === 'resolved') record.code_review.has_any_findings = true;
+    if (mutation === 'untrusted') entry.performed_via_github_app.id = 54321;
+    if (mutation === 'user') entry.user.type = 'User';
+    if (mutation === 'timestamp') entry.updated_at = 'invalid';
+    entry.body = mutation === 'malformed' ? '<!-- codex-review-state:v1 {bad} -->'
+      : `<!-- codex-review-state:v1 ${JSON.stringify(record)} -->`;
+    const {report} = await observe(f);
+    assert.equal(report.codex_observation, expected);
+    assert.equal(report.observation, 'PENDING_REVIEW');
+  });
+}
+test('Unconfigured Codex observer never trusts arbitrary receipts', async () => {
+  const {f} = codexFixture(); f.policy.codex_app_ids = [];
+  assert.equal((await observe(f)).report.codex_observation, 'NOT_CONFIGURED');
+});
+test('A malformed newer native receipt cannot revive an older clean receipt', async () => {
+  const {f, entry} = codexFixture();
+  f.evidence.comments.push({...entry, id: 12, updated_at: 'invalid'});
+  assert.equal((await observe(f)).report.codex_observation, 'UNKNOWN');
+});
 for (const filename of ['.github/workflows/example.yml', 'tests/example.js', 'docs/acceptance-policy.md', 'AGENTS.md']) {
   test(`Sensitive scope is R2: ${filename}`, async () => {
     const f = fixture(); f.files[0].filename = filename;

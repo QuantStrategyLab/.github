@@ -40,6 +40,13 @@ provider availability supplies authorization. Default identity lists are empty,
 so R1/R2 observations remain pending until a separately reviewed source policy
 establishes identities. No identities or settings are provisioned by this pilot.
 
+An optional `codex_app_ids` list enables a separate observation of the native
+Codex summary comment. The source must be a bot posted through a configured
+GitHub App and its review state must name the current head. The observation
+distinguishes running, stale, malformed and unresolved findings. An empty list
+leaves this observation unconfigured. This signal does not establish full
+coverage or base binding, does not accept a review, and never authorizes merge.
+
 The final read compares the candidate and evidence with the initial reads.
 Failures produce UNKNOWN and a failed, non-required observation job. Reports use
 fixed fields, candidate bindings and counts; paths, titles, patches, identities,
