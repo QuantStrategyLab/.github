@@ -108,6 +108,17 @@ PLACEHOLDER_BUCKET = re.compile(
     r"|^bucket(?:-|$)"
 )
 
+# Section 13 asks for a placeholder wherever a deployed subdomain would appear,
+# so `YOUR_SUBDOMAIN.workers.dev` is the correct form, not a finding. Matching
+# the domain shape alone reports the guide's own advice as a leak, which is how
+# a check earns the reputation that lets the real leak through.
+PLACEHOLDER_SUBDOMAIN = re.compile(
+    r"^[<{$]|[<>{}]"
+    r"|^(?:your|my|example|sample|placeholder)[-_]"
+    r"|^subdomain(?:-|$)"
+    r"|^x{2,}$"
+)
+
 URL_TOKEN = re.compile(r"https?://[^\s)\]\"'<>`]+")
 FENCED_BLOCK = re.compile(r"^```.*?^```", re.DOTALL | re.MULTILINE)
 
@@ -138,6 +149,24 @@ def bucket_is_real(text: str, match: re.Match, ctx: FileContext) -> bool:
     if bucket.endswith(".") and not bucket.endswith("..."):
         bucket = bucket[:-1]
     return bool(bucket) and not PLACEHOLDER_BUCKET.search(bucket)
+
+
+def subdomain_is_real(text: str, match: re.Match, ctx: FileContext) -> bool:
+    """A placeholder subdomain is the form section 13 asks for, not a leak.
+
+    What survives this predicate is a subdomain that was actually deployed,
+    which is the thing the rule is about.
+
+    The fenced-block exemption is repeated here because `check_leaks` only
+    applies it to patterns without a predicate. Without this line, installing
+    the predicate would make an example that shows what to avoid start
+    reporting — a wider blocking set than the rule had before, which is not
+    what a narrowing fix should do.
+    """
+    if not ctx.prose[match.start():match.end()].strip():
+        return False
+    subdomain = match.group(0)[: -len(".workers.dev")]
+    return not PLACEHOLDER_SUBDOMAIN.search(subdomain.lower())
 
 
 def hex_is_prose(text: str, match: re.Match, ctx: FileContext) -> bool:
@@ -185,7 +214,7 @@ LEAK_PATTERNS = [
     (re.compile(r"\bgs://[^\s`)\]\"'<>]+"),
      "content", "non-placeholder bucket (section 13)", bucket_is_real),
     (re.compile(r"\b[\w-]+\.workers\.dev\b"),
-     "content", "personal subdomain (section 13)", None),
+     "content", "personal subdomain (section 13)", subdomain_is_real),
     (re.compile(r"\b[0-9a-f]{40}\b"),
      "content", "40-character hex string in prose (section 5)", hex_is_prose),
     # `| PR |` is a table header; `| PR #12 |` and `| #12 |` are the rows this

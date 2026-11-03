@@ -124,6 +124,35 @@ class LeakTest(CheckerTestCase):
         found = self.findings("Default root `gs://acme-prod-inputs/research/v2/input/`.\n")
         self.assertTrue(any("non-placeholder bucket" in m for m in found))
 
+    def test_placeholder_subdomain_is_not_reported(self):
+        # Section 13 asks for a placeholder where a deployed subdomain would
+        # appear. Reporting the guide's own recommended form is how a check
+        # teaches people to ignore it.
+        for text in (
+            "Open https://YOUR_SUBDOMAIN.workers.dev/admin.\n",
+            "Set the host to https://your-subdomain.workers.dev.\n",
+            "The example uses https://xxx.workers.dev.\n",
+            "Deploy to https://<subdomain>.workers.dev.\n",
+        ):
+            with self.subTest(text=text):
+                self.assertEqual(self.findings(text), [])
+
+    def test_real_subdomain_is_reported(self):
+        found = self.findings("Open https://pigbibi.workers.dev/admin.\n")
+        self.assertTrue(any("personal subdomain" in m for m in found))
+
+    def test_subdomain_in_a_fenced_block_is_an_example(self):
+        # The guide shows forbidden shapes inside fenced blocks. Installing a
+        # predicate on the rule must not start reporting those examples, or a
+        # narrowing fix silently widens what blocks.
+        text = (
+            "Do not publish a real host:\n\n"
+            "```markdown\n"
+            "Do not publish https://demo.workers.dev as a real host.\n"
+            "```\n"
+        )
+        self.assertEqual(self.findings(text), [])
+
     def test_sha_in_url_is_not_reported(self):
         text = (
             "- [Store](https://github.com/QuantStrategyLab/QuantPlatformKit/blob/"
