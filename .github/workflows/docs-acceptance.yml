@@ -1,0 +1,107 @@
+name: Documentation acceptance
+
+# Reusable so the rule set has one copy.
+#
+# A repository that vendors its own copy of the checker keeps enforcing
+# whatever that copy said on the day it was copied. Two repositories then hold
+# each other to different versions of one rule, and neither is wrong. Running
+# the checker from here makes the rule set a single artefact: changing it is a
+# pull request in this repository, reviewed once, and every caller picks it up
+# by bumping the commit it names.
+#
+# The caller names the commit it trusts. That is deliberate — a rule change
+# cannot reach a repository without a visible edit in that repository's own
+# workflow file, and a review of that edit.
+
+on:
+  workflow_call:
+    inputs:
+      policy-revision:
+        description: Commit in QuantStrategyLab/.github that supplies the checker.
+        required: true
+        type: string
+      mode:
+        description: advisory reports findings without failing; enforce blocks.
+        required: false
+        type: string
+        default: advisory
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    name: Documentation check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository under review
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          path: target
+
+      - name: Check out the rules
+        uses: actions/checkout@v6
+        with:
+          repository: QuantStrategyLab/.github
+          ref: ${{ inputs.policy-revision }}
+          persist-credentials: false
+          path: policy
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # A mistyped mode would otherwise fall through to advisory and read as a
+      # passing check, which is the one failure this workflow must not have.
+      - name: Validate the mode
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          case "$MODE" in
+            advisory|enforce) ;;
+            *) echo "unknown mode: $MODE"; exit 1 ;;
+          esac
+
+      # The checker is tested before it is trusted. A rule that stopped
+      # matching reports a clean repository, and a clean report is
+      # indistinguishable from a compliant one.
+      - name: Test the checker
+        working-directory: policy
+        run: python scripts/test_style.py
+
+      - name: Check documentation rules
+        env:
+          MODE: ${{ inputs.mode }}
+        run: |
+          args="--root target --phase 2"
+          if [ "$MODE" = "advisory" ]; then
+            args="$args --advisory"
+          fi
+          python policy/scripts/check_style.py $args
+
+      # Whoever reads a failing check needs the rule and the reason, not just
+      # the finding. This is the only place the standard is stated to someone
+      # who arrived from a red check.
+      - name: Point at the rule set
+        if: always()
+        env:
+          MODE: ${{ inputs.mode }}
+          REVISION: ${{ inputs.policy-revision }}
+        run: |
+          {
+            echo "## Documentation rules"
+            echo
+            echo "- Rule set: https://github.com/QuantStrategyLab/.github/blob/${REVISION}/docs/STYLE_GUIDE.md"
+            echo "- Checker: https://github.com/QuantStrategyLab/.github/blob/${REVISION}/scripts/check_style.py"
+            echo "- Mode: \`${MODE}\`"
+            echo
+            if [ "$MODE" = "advisory" ]; then
+              echo "Findings are reported but do not fail this job yet. Fixing them"
+              echo "is what lets this repository move to \`enforce\`."
+            else
+              echo "Findings fail this job. Fix the finding, or change the rule in"
+              echo "the rule set — do not add an exception in this repository."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

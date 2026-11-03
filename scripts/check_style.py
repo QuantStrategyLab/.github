@@ -564,14 +564,18 @@ def check_internal_paths(root: Path, report: Report) -> None:
             report.add("content", f"{rel}: committed output directory (section 5)")
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=".", help="repository root (default: cwd)")
     parser.add_argument(
         "--phase", type=int, choices=(1, 2), default=1,
         help="1 blocks leaks and broken links; 2 also blocks naming (default: 1)",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--advisory", action="store_true",
+        help="report findings but always exit 0, for adopting a repository gradually",
+    )
+    args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
     report = Report(PHASE_BLOCKING[args.phase])
@@ -598,6 +602,13 @@ def main() -> int:
         f"phase {args.phase}: {len(blocking)} blocking, {len(advisory)} advisory. "
         "Advisory findings become blocking in phase 2."
     )
+    if args.advisory:
+        # A repository adopts the rule set before it can satisfy it. Failing on
+        # the adoption pull request would make that pull request the first thing
+        # the check blocks, and the check would be removed instead of the
+        # findings fixed. The findings are still printed and still counted.
+        print("advisory run: exit status forced to 0")
+        return 0
 
     return 1 if blocking else 0
 

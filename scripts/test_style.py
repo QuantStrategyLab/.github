@@ -1,8 +1,9 @@
 """Regression tests for the documentation checker.
 
-The checker is copied into 26 repositories, so a rule that silently stops
-working fails 26 times at once and nobody notices. Each test here pins one
-decision that was easy to get wrong:
+This checker runs against every repository that adopts the rule set, from one
+copy or many, so a rule that silently stops working fails everywhere at once
+and nobody notices. Each test here pins one decision that was easy to get
+wrong:
 
   * the leak heuristics must not report the placeholder forms the guide asks
     for, or the report fills with non-defects and gets ignored
@@ -17,9 +18,11 @@ Run with `python scripts/test_style.py`.
 from __future__ import annotations
 
 import importlib.util
+import io
 import subprocess
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 
 _spec = importlib.util.spec_from_file_location(
@@ -363,6 +366,32 @@ class PhaseTest(CheckerTestCase):
         report = self.report(phase=2)
         check_style.check_naming(self.root, report)
         self.assertTrue(report.blocking_findings())
+
+
+class AdvisoryModeTest(CheckerTestCase):
+    """Adoption has to be possible before compliance.
+
+    A repository adds the check while it still has findings. If that pull
+    request goes red, the check is removed instead of the findings fixed, and
+    the repository ends up with neither.
+    """
+
+    def run_main(self, *extra: str) -> tuple[int, str]:
+        with redirect_stdout(io.StringIO()) as captured:
+            code = check_style.main(["--root", str(self.root), "--phase", "2", *extra])
+        return code, captured.getvalue()
+
+    def test_advisory_reports_the_findings_it_would_have_blocked_on(self):
+        self.write("docs/hk_equity_runtime.md", "# x\n")
+        code, output = self.run_main("--advisory")
+        self.assertEqual(code, 0)
+        self.assertIn("underscores", output)
+        self.assertIn("advisory run", output)
+
+    def test_without_advisory_the_same_findings_still_fail(self):
+        self.write("docs/hk_equity_runtime.md", "# x\n")
+        code, _ = self.run_main()
+        self.assertEqual(code, 1)
 
 
 if __name__ == "__main__":
