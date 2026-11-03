@@ -284,6 +284,12 @@ def strip_fenced_blocks(text: str) -> str:
     return re.sub(r"^```.*?^```", "", text, flags=re.DOTALL | re.MULTILINE)
 
 
+# GitHub recognises these two template names with underscores only. Renaming
+# them to hyphens silently disables the template, so they are exempt from the
+# underscore rule while the lowercase rule still applies.
+GITHUB_TEMPLATE_NAMES = {"pull_request_template", "issue_template"}
+
+
 def check_naming(root: Path, report: Report) -> None:
     for path in iter_files(root):
         if not is_markdown(path):
@@ -306,7 +312,7 @@ def check_naming(root: Path, report: Report) -> None:
                 f"{rel}: English is the base name (section 4); .en.md is not a suffix",
             )
 
-        if core not in CONVENTIONAL_UPPER:
+        if core not in CONVENTIONAL_UPPER and core not in GITHUB_TEMPLATE_NAMES:
             if core != core.lower():
                 report.add("naming", f"{rel}: file name must be lowercase (section 7)")
             if "_" in core:
