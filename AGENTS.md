@@ -65,7 +65,8 @@ Organization documentation rules are checked by `python scripts/check_style.py`,
 
 - Do not assume this file applies to other repositories; each repository carries
   its own `AGENTS.md` and `.github/engineering.md`.
-- Do not add organization-wide automation or branch-protection policy here.
+- Organization-wide automation or branch-protection policy requires an explicit
+  owner request and a reviewed change.
 - Do not weaken the style guide's rules on credentials, account identifiers or
   private infrastructure without a stated reason.
 

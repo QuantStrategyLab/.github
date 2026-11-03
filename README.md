@@ -21,3 +21,5 @@ Organization-wide files for QuantStrategyLab repositories.
 ## Contributing
 
 Open a pull request. Describe the problem, the change, and the effect on existing repositories. AI assistants and maintainers follow [AGENTS.md](AGENTS.md).
+
+- [Governance shadow engine](docs/governance-shadow.md) — reusable report-only review observations.
