@@ -29,7 +29,7 @@ async function observe(f = fixture()) {
   const core = {setFailed: () => {state.failed = true;}, setOutput: () => {}, summary: {
     addHeading() {return this;}, addCodeBlock(s) {state.summary = s; return this;}, async write() {}}};
   const report = await execute(github, {repo: {owner: '<PROJECT_ID>', repo: 'sample'}}, core, require,
-    {env: {MODE: f.mode || 'SHADOW', POLICY_REVISION: R, PR_NUMBER: '1'}});
+    {env: {MODE: f.mode || 'SHADOW', POLICY_REVISION: R, PR_NUMBER: '1', REQUIRE_CODEX_MARKER: f.requireMarker === undefined ? 'false' : f.requireMarker}});
   assert.equal(report.merge_authorized, false);
   assert.ok(!state.summary.includes('private token'));
   return {report, state};
@@ -229,4 +229,52 @@ test('Optional style advice does not require repair', async () => {
   const {f, record} = await recordFixture();
   record.findings = [{kind: 'advisory'}]; f.evidence.reviews[0].body = JSON.stringify(record);
   assert.equal((await observe(f)).report.observation, 'PENDING_OWNER');
+});
+
+// The optional prerequisite is necessary evidence only, never merge authority.
+test('Required Codex prerequisite fails closed when unconfigured', async () => {
+  const f = fixture(); f.requireMarker = 'true';
+  const {report, state} = await observe(f);
+  assert.equal(state.failed, true);
+  assert.equal(report.codex_prerequisite, 'BLOCKED');
+});
+test('Required Codex prerequisite accepts an authenticated completed exact-head marker', async () => {
+  const {f} = codexFixture(); f.requireMarker = 'true';
+  const {report, state} = await observe(f);
+  assert.equal(state.failed, false);
+  assert.equal(report.codex_prerequisite, 'SATISFIED');
+  assert.equal(report.merge_authorized, false);
+});
+for (const mutation of ['missing', 'untrusted', 'stale', 'running', 'unresolved', 'malformed', 'duplicate', 'merged', 'base-drift', 'head-drift', 'invalid-input', 'api']) {
+  test(`Required marker blocks unsafe evidence: ${mutation}`, async () => {
+    const {f, entry, record} = codexFixture(); f.requireMarker = 'true';
+    if (mutation === 'missing') f.evidence.comments = [];
+    if (mutation === 'untrusted') entry.performed_via_github_app.id = 54321;
+    if (mutation === 'stale') record.code_review.commit_sha = 'd'.repeat(40);
+    if (mutation === 'running') record.code_review.status = 'running';
+    if (mutation === 'unresolved') record.code_review.has_unresolved_findings = true;
+    entry.body = mutation === 'malformed' ? '<!-- codex-review-state:v1 {bad} -->'
+      : `<!-- codex-review-state:v1 ${JSON.stringify(record)} -->`;
+    if (mutation === 'duplicate') entry.body += entry.body;
+    if (mutation === 'merged') f.pr.state = 'closed';
+    if (mutation.endsWith('-drift')) {
+      f.current = structuredClone(f.pr);
+      f.current[mutation === 'base-drift' ? 'base' : 'head'].sha = 'd'.repeat(40);
+    }
+    if (mutation === 'invalid-input') f.requireMarker = 'unknown';
+    if (mutation === 'api') f.apiError = true;
+    const {report, state} = await observe(f);
+    assert.equal(state.failed, true);
+    assert.equal(report.codex_prerequisite, 'BLOCKED');
+    assert.ok(!state.summary.includes('private token'));
+  });
+}
+test('Parallel observations keep no acceptance cache across a moved head', async () => {
+  const {f} = codexFixture(); f.requireMarker = 'true';
+  const moved = structuredClone(f); moved.current = structuredClone(f.pr);
+  moved.current.head.sha = 'd'.repeat(40);
+  const [clean, stale] = await Promise.all([observe(f), observe(moved)]);
+  assert.equal(clean.report.codex_prerequisite, 'SATISFIED');
+  assert.equal(stale.report.codex_prerequisite, 'BLOCKED');
+  assert.equal(stale.state.failed, true);
 });

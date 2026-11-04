@@ -81,3 +81,11 @@ Run `node --test scripts/test-governance-shadow.cjs`, the existing Python checke
 and secret-scan tests, and `python scripts/check_style.py --phase 2`. The new
 `Governance shadow tests` workflow exercises the exact inline reusable code with
 fake API responses. Offline tests do not prove hosted execution or adoption.
+
+## Optional exact-head prerequisite
+
+[Collaboration governance](collaboration-governance.md) defines the proposed
+`require-codex-marker: true` input. It fails the existing observation job when
+trusted completed current-head evidence is absent or unresolved. Existing
+callers keep the default `false`. Passing the opt-in check never authorizes
+merge; no caller or required-check setting is changed by this source proposal.
