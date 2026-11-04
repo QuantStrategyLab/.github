@@ -63,6 +63,9 @@ jobs:
           done < "$RUNNER_TEMP/repos.txt"
           ls "$org_dir"
 
+      - name: Test the link checker
+        run: python3 scripts/test_cross_repo_links.py
+
       # The exit status is captured rather than allowed to fail the step, so
       # that the issue is opened before the run goes red. A run that fails
       # without leaving a record is a run nobody reads.
