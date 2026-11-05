@@ -99,6 +99,18 @@ class NamingTest(CheckerTestCase):
         check_style.check_naming(self.root, report)
         self.assertTrue(any(".en.md is not a suffix" in m for m in self.messages(report, "naming")))
 
+    def test_root_proposal_has_its_owner_requested_name(self):
+        self.write("PROPOSAL.md", "# Proposed governance change\n")
+        report = self.report()
+        check_style.check_naming(self.root, report)
+        self.assertEqual(self.messages(report, "naming"), [])
+
+    def test_nested_proposal_still_requires_lowercase(self):
+        self.write("docs/PROPOSAL.md", "# x\n")
+        report = self.report()
+        check_style.check_naming(self.root, report)
+        self.assertTrue(any("lowercase" in m for m in self.messages(report, "naming")))
+
     def test_uppercase_convention_is_allowed(self):
         self.write("SECURITY.md", "# x\n")
         report = self.report()
