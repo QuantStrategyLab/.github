@@ -8,7 +8,10 @@ QuantAIService and could not converge. Its own check, status and workflow-run
 triggers change the check evidence it rereads, so every evaluation ended in
 `error` and closed both repositories to merges. Both returned to the canonical
 `.github/workflows/risk-gate.yml` that the other 23 repositories run. The text
-below is the record of the proposed design, not the deployed gate.
+below is the record of the proposed design, not the deployed gate. The shadow
+observer and its tests were removed on 2026-11-06, so the references below to
+`scripts/test-governance-shadow.cjs` and `.github/governance/policy.json` are
+historical.
 
 ## Decision rule
 
