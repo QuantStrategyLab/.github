@@ -3,6 +3,16 @@ name: PR risk gate
 on:
   pull_request_target:
     types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+  issue_comment:
+    types: [created, edited, deleted]
+  check_run:
+    types: [completed, rerequested]
+  check_suite:
+    types: [completed]
+  status:
+  workflow_run:
+    workflows: [Documentation check, Engineering governance, Governance shadow tests, Secret scan tests]
+    types: [completed, in_progress]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -10,19 +20,59 @@ on:
         required: true
         type: string
 
-# No checkout, PR code execution, secret access, label writes or merge permission.
+# Trusted workflow only: no candidate code, label writes or merge permission.
 permissions:
   contents: read
   pull-requests: read
   issues: read
+  checks: read
   statuses: write
 
-concurrency:
-  group: risk-gate-${{ github.event.pull_request.number || inputs.pr_number }}
-  cancel-in-progress: true
-
 jobs:
+  discover:
+    if: >-
+      (github.event_name != 'issue_comment' || github.event.issue.pull_request) &&
+      (github.event_name != 'status' ||
+       (github.event.context != 'risk-gate' && github.event.context != 'pr-template'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      prs: ${{ steps.candidates.outputs.prs }}
+    steps:
+      - id: candidates
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+        with:
+          script: |
+            try {
+              const payload = context.payload;
+              let numbers = [payload.pull_request?.number || payload.issue?.number || Number(process.env.PR_NUMBER)].filter(Boolean);
+              if (!numbers.length) {
+                const sha = payload.check_run?.head_sha || payload.check_suite?.head_sha || payload.workflow_run?.head_sha || payload.sha;
+                if (typeof sha !== 'string' || !/^[0-9a-f]{40}$/.test(sha)) throw new Error();
+                const associated = await github.paginate(github.rest.repos.listPullRequestsAssociatedWithCommit,
+                  {...context.repo, commit_sha: sha, per_page: 100});
+                numbers = associated.filter(pr => pr.state === 'open' && pr.head?.sha === sha).map(pr => pr.number);
+              }
+              if (numbers.some(number => !Number.isSafeInteger(number) || number < 1)) throw new Error();
+              core.setOutput('prs', JSON.stringify([...new Set(numbers)]));
+            } catch { core.setFailed('Candidate lookup unavailable; approval blocked'); }
+
   evaluate:
+    needs: discover
+    if: needs.discover.outputs.prs != '[]' && needs.discover.outputs.prs != ''
+    strategy:
+      fail-fast: false
+      matrix:
+        pr: ${{ fromJSON(needs.discover.outputs.prs) }}
+    # Comment, PR and check events resolve to the same PR writer across restarts.
+    concurrency:
+      group: risk-gate-${{ github.repository }}-${{ matrix.pr }}
+      cancel-in-progress: false
     name: Evaluate PR governance
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -30,18 +80,47 @@ jobs:
       - name: Publish risk-gate and PR template checks on the PR head
         uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         env:
-          PR_NUMBER: ${{ inputs.pr_number }}
+          PR_NUMBER: ${{ matrix.pr }}
         with:
           script: |
-            // Executed only by the trusted base-branch workflow. Never load PR code.
-            const number = context.payload.pull_request?.number || Number(process.env.PR_NUMBER);
-            if (!Number.isSafeInteger(number) || number < 1) throw new Error('Invalid PR number');
+            // Only trusted base/default-branch workflow code executes; never load PR code.
             const repo = context.repo;
+            const fail = () => { throw new Error('Governance evidence unavailable'); };
+            const hash = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
             const target = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`;
-            let sha;
-            const status = (name, state, description) => github.rest.repos.createCommitStatus({
-              ...repo, sha, context: name, state, description, target_url: target,
-            });
+            const number = Number(process.env.PR_NUMBER);
+            // Explicit owner-only globs: match normalized lowercase snake_case paths.
+            // * never crosses /; ** does. No docs/tests exemption applies to this list.
+            const ownerOnlyGlobs = [
+              '**/*secret*', '**/*secret*/**', '**/*credential*', '**/*credential*/**',
+              '**/.env*', '**/*.pem', '**/*.key', '**/*.p12', '**/*.pfx',
+              '**/*iam*', '**/*iam*/**', '**/*service_account*', '**/*service_account*/**',
+              '**/*serviceaccount*', '**/*serviceaccount*/**', '**/*permission*', '**/*permission*/**',
+              '**/*role_binding*', '**/*role_binding*/**',
+              '**/*deploy*', '**/*deploy*/**', '**/*release*', '**/*release*/**',
+              '**/*.tf', '**/*.tfvars', '**/dockerfile*', '**/docker-compose*', '**/compose.y*ml',
+              '**/vercel.json', '**/wrangler.*', '**/firebase.json', '**/k8s/**', '**/kubernetes/**',
+              '**/*trad*', '**/*trad*/**', '**/*execution*', '**/*execution*/**',
+              '**/*executor*', '**/*executor*/**', '**/*order*', '**/*order*/**',
+              '**/*broker*', '**/*broker*/**', '**/*kelly*', '**/*kelly*/**',
+              '**/*stop*loss*', '**/*stop*loss*/**',
+              '.github/governance/**', '.github/workflows/risk-gate.yml', '**/codeowners',
+            ];
+            const normalize = path => path.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+            function matchesGlob(path, glob) {
+              let pattern = '^';
+              for (let i = 0; i < glob.length; i++) {
+                const char = glob[i];
+                if (char === '*' && glob[i + 1] === '*') {
+                  i++;
+                  if (glob[i + 1] === '/') { pattern += '(?:.*/)?'; i++; }
+                  else pattern += '.*';
+                } else if (char === '*') pattern += '[^/]*';
+                else pattern += '\\^$.*+?()[]{}|'.includes(char) ? '\\' + char : char;
+              }
+              return new RegExp(pattern + '$').test(normalize(path));
+            }
+            const ownerOnly = path => ownerOnlyGlobs.some(glob => matchesGlob(path, glob));
             function highRisk(path) {
               const p = path.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
               if (p.startsWith('.github/workflows/') || /(^|\/)codeowners$/.test(p)) return true;
@@ -61,39 +140,157 @@ jobs:
                 && present(/what changed|summary|problem|changes|变更|改动/i)
                 && present(/how verified|verif|validat|test(?:ing| plan)?|验证|测试/i);
             }
-            try {
-              const { data: pr } = await github.rest.pulls.get({ ...repo, pull_number: number });
-              sha = pr.head.sha;
-              await status('risk-gate', 'pending', 'Evaluating changed paths and owner approval');
-              await status('pr-template', 'pending', 'Checking AI, change and verification fields');
-              const files = await github.paginate(github.rest.pulls.listFiles, { ...repo, pull_number: number, per_page: 100 });
-              // GitHub caps this API at 3000 files. Incomplete diffs must not pass as low risk.
-              if (files.length !== pr.changed_files || files.length >= 3000) throw new Error('Incomplete PR file list');
-              const risky = files.some(file => [file.filename, file.previous_filename].filter(Boolean).some(highRisk));
-              let approved = false;
-              if (pr.labels.some(label => label.name === 'owner-approved')) {
-                const events = await github.paginate(github.rest.issues.listEvents, { ...repo, issue_number: number, per_page: 100 });
-                const latest = events.filter(event => ['labeled', 'unlabeled'].includes(event.event)
-                  && event.label?.name === 'owner-approved').sort((a, b) => b.id - a.id)[0];
-                // A shared GitHub identity cannot distinguish the owner from their AI agents.
-                approved = latest?.event === 'labeled' && latest.actor?.login === 'Pigbibi';
+
+            function cleanReview(comments, policy, sha) {
+              if (!Array.isArray(policy.codex_app_ids) || !policy.codex_app_ids.length
+                  || !policy.codex_app_ids.every(id => Number.isSafeInteger(id) && id > 0)) return false;
+              const entries = comments.filter(entry => entry.user?.type === 'Bot'
+                && policy.codex_app_ids.includes(entry.performed_via_github_app?.id)
+                && typeof entry.body === 'string' && entry.body.includes('codex-review-state:v1'));
+              if (!entries.length || entries.some(entry => !Number.isSafeInteger(entry.id)
+                  || !Number.isFinite(Date.parse(entry.updated_at)) || Date.parse(entry.updated_at) > Date.now())) return false;
+              entries.sort((a, b) => Date.parse(b.updated_at) - Date.parse(a.updated_at) || b.id - a.id);
+              if ((entries[0].body.match(/codex-review-state:v1/g) || []).length !== 1) return false;
+              const match = /<!-- codex-review-state:v1 (\{[^\n]*\}) -->/.exec(entries[0].body);
+              if (!match) return false;
+              let review;
+              try { review = JSON.parse(match[1]).code_review; } catch { return false; }
+              return review?.commit_sha === sha && review.status === 'completed'
+                && typeof review.has_any_findings === 'boolean' && review.has_unresolved_findings === false;
+            }
+            async function requiredChecks(number, branch) {
+              // GraphQL null means no classic rule; absent data/permission errors are unknown.
+              const data = await github.graphql(`query($owner:String!,$repo:String!,$number:Int!) {
+                repository(owner:$owner,name:$repo) { pullRequest(number:$number) { baseRef {
+                  branchProtectionRule { requiredStatusCheckContexts requiredStatusChecks { context app { databaseId } } }
+                } } }
+              }`, {...repo, number});
+              const ref = data.repository?.pullRequest?.baseRef;
+              if (!ref || !Object.hasOwn(ref, 'branchProtectionRule')) fail();
+              const rule = ref.branchProtectionRule;
+              if (rule !== null && (!Array.isArray(rule.requiredStatusChecks)
+                  || !Array.isArray(rule.requiredStatusCheckContexts))) fail();
+              const classic = rule?.requiredStatusChecks.map(check => ({context: check.context,
+                app: check.app === null ? null : check.app?.databaseId})) || [];
+              if (rule?.requiredStatusCheckContexts.some(name => !classic.some(check => check.context === name))) fail();
+              const rules = await github.paginate(github.rest.repos.getBranchRules, {...repo, branch, per_page: 100});
+              const required = [...classic];
+              for (const entry of rules) {
+                if (entry.type !== 'required_status_checks') continue;
+                if (!Array.isArray(entry.parameters?.required_status_checks)) fail();
+                for (const check of entry.parameters.required_status_checks) {
+                  required.push({context: check.context, app: check.integration_id ?? null});
+                }
               }
-              const { data: current } = await github.rest.pulls.get({ ...repo, pull_number: number });
-              if (current.head.sha !== sha || current.body !== pr.body
-                  || JSON.stringify(current.labels.map(x => x.name).sort()) !== JSON.stringify(pr.labels.map(x => x.name).sort())) {
-                throw new Error('PR changed during evaluation; wait for the latest event');
+              if (!required.length || required.some(check => typeof check.context !== 'string' || !check.context
+                  || (check.app !== null && (!Number.isSafeInteger(check.app) || check.app <= 0)))) fail();
+              return {required, rules};
+            }
+            function checksGreen(evidence, sha, templateOK) {
+              return evidence.required.every(required => {
+                // These two contexts are produced here. Validate the template locally; risk-gate
+                // is this decision's output, never an input. Other required jobs are never exempt.
+                if (['risk-gate', 'pr-template'].includes(required.context)) {
+                  return (required.app === null || required.app === 15368) && templateOK;
+                }
+                const checks = evidence.checks.filter(check => check.name === required.context
+                  && (required.app === null || check.app?.id === required.app)).sort((a, b) => b.id - a.id);
+                const statuses = evidence.statuses.filter(status => status.context === required.context).sort((a, b) => b.id - a.id);
+                if (checks.some(check => !Number.isSafeInteger(check.id)) || statuses.some(status => !Number.isSafeInteger(status.id))) return false;
+                // Legacy statuses do not expose their source App. They cannot satisfy App-bound
+                // requirements; leave enforcement closed rather than infer identity from a login.
+                if (required.app !== null && statuses.length) return false;
+                if (!checks.length && !statuses.length) return false;
+                return (!checks.length || (checks[0].head_sha === sha && checks[0].status === 'completed'
+                    && checks[0].conclusion === 'success'))
+                  && (!statuses.length || (statuses[0].sha === sha && statuses[0].state === 'success'));
+              });
+            }
+            {
+              let sha;
+              const status = async (name, state, description) => {
+                try {
+                  await github.rest.repos.createCommitStatus({
+                    ...repo, sha, context: name, state, description, target_url: target,
+                  });
+                } catch { fail(); }
+              };
+              try {
+                if (!Number.isSafeInteger(number) || number < 1) fail();
+                const args = {...repo, pull_number: number};
+                const readPR = async () => (await github.rest.pulls.get(args)).data;
+                const binding = pr => [pr.state, pr.head?.sha, pr.base?.sha, pr.base?.ref,
+                  pr.base?.repo?.full_name, pr.changed_files, pr.body, pr.labels];
+                const pr = await readPR();
+                sha = pr.head?.sha;
+                if (pr.state !== 'open' || !hash(sha) || !hash(pr.base?.sha) || !pr.base?.ref
+                    || pr.base.repo?.full_name?.toLowerCase() !== `${repo.owner}/${repo.repo}`.toLowerCase()) fail();
+                await status('risk-gate', 'pending', 'Evaluating current review, paths and required checks');
+                const templateOK = completeTemplate(pr.body);
+                await status('pr-template', templateOK ? 'success' : 'failure', templateOK
+                  ? 'AI, change and verification fields are filled in' : 'Fill in AI, change and verification sections');
+                const readFiles = async () => {
+                  const files = await github.paginate(github.rest.pulls.listFiles, {...args, per_page: 100});
+                  if (!Number.isSafeInteger(pr.changed_files) || pr.changed_files < 1
+                      || files.length !== pr.changed_files || files.length >= 3000
+                      || new Set(files.map(file => file.filename)).size !== files.length
+                      || files.some(file => typeof file.filename !== 'string' || !file.filename
+                        || !['added', 'modified', 'removed', 'renamed'].includes(file.status)
+                        || (file.status === 'renamed' && !file.previous_filename))) fail();
+                  return files;
+                };
+                const files = await readFiles();
+                const paths = files.flatMap(file => [file.filename, file.previous_filename].filter(Boolean));
+                const protectedPath = paths.some(ownerOnly);
+                const risky = protectedPath || paths.some(highRisk);
+                let approved = false;
+                let before, after;
+                if (protectedPath) {
+                  const readEvents = async () => github.paginate(github.rest.issues.listEvents,
+                    {...repo, issue_number: number, per_page: 100});
+                  before = await readEvents();
+                  if (pr.labels.some(label => label.name === 'owner-approved')) {
+                    const events = before;
+                    const latest = events.filter(event => ['labeled', 'unlabeled'].includes(event.event)
+                      && event.label?.name === 'owner-approved').sort((a, b) => b.id - a.id)[0];
+                    // A shared GitHub identity cannot distinguish the owner from their AI agents.
+                    approved = latest?.event === 'labeled' && latest.actor?.login === 'Pigbibi';
+                  }
+                  after = await readEvents();
+                } else if (risky) {
+                  const {data: content} = await github.rest.repos.getContent({...repo,
+                    path: '.github/governance/policy.json', ref: pr.base.sha});
+                  if (content.encoding !== 'base64' || typeof content.content !== 'string') fail();
+                  const policy = JSON.parse(Buffer.from(content.content, 'base64').toString('utf8'));
+                  const readEvidence = async () => ({
+                    ...await requiredChecks(number, pr.base.ref),
+                    comments: await github.paginate(github.rest.issues.listComments, {...repo, issue_number: number, per_page: 100}),
+                    checks: await github.paginate(github.rest.checks.listForRef, {...repo, ref: sha, filter: 'latest', per_page: 100}),
+                    statuses: (await github.paginate(github.rest.repos.listCommitStatusesForRef, {...repo, ref: sha, per_page: 100}))
+                      .filter(entry => !['risk-gate', 'pr-template'].includes(entry.context)),
+                  });
+                  before = await readEvidence();
+                  approved = templateOK && cleanReview(before.comments, policy, sha) && checksGreen(before, sha, templateOK);
+                  after = await readEvidence();
+                }
+                const currentFiles = await readFiles();
+                const current = await readPR();
+                if (JSON.stringify(binding(current)) !== JSON.stringify(binding(pr))
+                    || JSON.stringify(currentFiles) !== JSON.stringify(files)
+                    || JSON.stringify(before) !== JSON.stringify(after)) fail();
+                const allowed = !risky || approved;
+                await status('risk-gate', allowed ? 'success' : 'failure', !risky ? 'Low-risk paths: no owner approval needed'
+                  : protectedPath ? (approved ? 'Owner-only paths: existing owner label verified' : 'Owner-only paths: owner approval required')
+                  : approved ? 'Exact-head clean review and required checks verified' : 'Automatic approval blocked: review or required checks incomplete');
+                if (!allowed || !templateOK) core.setFailed('Required PR governance checks did not pass');
+              } catch {
+                // Never expose API errors, comment bodies, paths, identities or tokens.
+                if (hash(sha)) {
+                  try {
+                    await status('risk-gate', 'error', 'Evidence unavailable or changed; approval blocked');
+                    await status('pr-template', 'error', 'Evaluation incomplete; approval blocked');
+                  } catch { /* Status transport failure must not expose API diagnostics. */ }
+                }
+                core.setFailed('Governance evidence unavailable; approval blocked');
               }
-              const allowed = !risky || approved;
-              await status('risk-gate', allowed ? 'success' : 'failure', !risky ? 'Low-risk paths: no owner approval needed'
-                : approved ? 'High-risk paths: owner-approved label verified' : 'High-risk paths: needs-owner-approval; owner must add owner-approved');
-              const templateOK = completeTemplate(pr.body);
-              await status('pr-template', templateOK ? 'success' : 'failure', templateOK
-                ? 'AI, change and verification fields are filled in' : 'Fill in AI assistance, What changed and How verified sections');
-              if (!allowed || !templateOK) core.setFailed('Required PR governance checks did not pass');
-            } catch (error) {
-              if (sha) {
-                await status('risk-gate', 'error', 'Evaluation failed; inspect the trusted workflow run');
-                await status('pr-template', 'error', 'Evaluation failed; inspect the trusted workflow run');
-              }
-              throw error;
             }
