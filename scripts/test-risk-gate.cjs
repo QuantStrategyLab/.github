@@ -28,7 +28,7 @@ function marker(changes = {}) {
     status: 'completed', has_any_findings: false, has_unresolved_findings: false, ...changes}})} -->`;
 }
 async function run(f = fixture()) {
-  const out = {statuses: [], errors: [], reads: {}, failures: []};
+  const out = {statuses: [], errors: [], reads: {}, failures: [], statusRefs: []};
   const clone = x => structuredClone(x);
   const read = key => {
     out.reads[key] = (out.reads[key] || 0) + 1;
@@ -41,7 +41,10 @@ async function run(f = fixture()) {
       getBranchRules: 'rules', listPullRequestsAssociatedWithCommit: 'associated',
       getContent: async () => ({data: {encoding: 'base64', content: Buffer.from(JSON.stringify(read('policy'))).toString('base64')}}),
       createCommitStatus: async params => {if (f.apiError === 'publish') throw new Error('private diagnostic <PROJECT_ID>'); out.statuses.push(params);}}},
-    paginate: async method => read(method),
+    paginate: async (method, params) => {
+      if (method === 'statuses') out.statusRefs.push(params.ref);
+      return read(method);
+    },
     graphql: async () => {const checks = read('required'); return {repository: {pullRequest: {baseRef: {
       branchProtectionRule: f.noClassic ? null : {requiredStatusChecks: checks, requiredStatusCheckContexts: checks.map(x => x.context)}}}}};}};
   const context = {repo: {owner: '<PROJECT_ID>', repo: 'sample'}, serverUrl: 'https://example.invalid', runId: 1,
@@ -101,14 +104,35 @@ for (const mutation of ['failure', 'skipped', 'neutral', 'pending', 'missing', '
     if (mutation === 'wrong-app') c.app.id = 54321;
     if (mutation === 'stale') c.head_sha = B;
     if (mutation === 'newer-failure') f.checks.push({...c, id: 2, conclusion: 'failure'});
-    if (mutation === 'status-pending') {f.required[2].app = null; f.statuses = [{id: 2, context: c.name, state: 'pending', sha: H}];}
+    if (mutation === 'status-pending') {f.required[2].app = null; f.statuses = [{id: 2, context: c.name, state: 'pending'}];}
     assert.notEqual((await run(f)).risk, 'success');
   });
 }
-test('Required status contexts also need an exact-head success', async () => {
+test('Legacy status responses without sha are bound to the immutable request ref', async () => {
   const f = fixture(); f.checks = []; f.required[2].app = null;
-  f.statuses = [{id: 1, context: 'Unit tests', sha: H, state: 'success'}];
+  f.statuses = [{id: 1, context: 'Unit tests', state: 'success'}];
+  const out = await run(f);
+  assert.equal(out.risk, 'success');
+  assert.deepEqual(out.statusRefs, [H, H]);
+});
+test('Legacy status approval rejects every non-success response', async () => {
+  const f = fixture(); f.checks = []; f.required[2].app = null;
+  f.statuses = [{id: 1, context: 'Unit tests', state: 'success'}];
   assert.equal((await run(f)).risk, 'success');
+  for (const state of ['failure', 'error', 'pending', undefined, 'unknown']) {
+    f.statuses[0].state = state;
+    assert.notEqual((await run(f)).risk, 'success');
+  }
+});
+test('Legacy status success cannot survive a concurrent head change', async () => {
+  const f = fixture(); f.checks = []; f.required[2].app = null;
+  f.statuses = [{id: 1, context: 'Unit tests', state: 'success'}];
+  assert.equal((await run(f)).risk, 'success');
+  f.changed = {pr: structuredClone(f.pr)};
+  f.changed.pr.head.sha = B;
+  const out = await run(f);
+  assert.notEqual(out.risk, 'success');
+  assert.deepEqual(out.statusRefs, [H, H]);
 });
 test('Ruleset checks are enforced alongside classic protection', async () => {
   const f = fixture(); f.rules = [{type: 'required_status_checks', parameters: {required_status_checks: [{context: 'Security', integration_id: 23456}]}}];
@@ -138,7 +162,7 @@ for (const key of ['pr', 'comments', 'checks', 'rules', 'required', 'files', 'st
     if (key === 'rules') f.changed.rules.push({type: 'required_status_checks', parameters: {required_status_checks: [{context: 'New gate'}]}});
     if (key === 'required') f.changed.required.push({context: 'New gate', app: null});
     if (key === 'files') f.changed.files[0].filename = 'src/secrets.js';
-    if (key === 'statuses') f.changed.statuses.push({id: 2, context: 'Unit tests', state: 'pending', sha: H});
+    if (key === 'statuses') f.changed.statuses.push({id: 2, context: 'Unit tests', state: 'pending'});
     assert.notEqual((await run(f)).risk, 'success');
   });
 }

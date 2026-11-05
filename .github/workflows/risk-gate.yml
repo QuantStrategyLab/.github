@@ -203,7 +203,7 @@ jobs:
                 if (!checks.length && !statuses.length) return false;
                 return (!checks.length || (checks[0].head_sha === sha && checks[0].status === 'completed'
                     && checks[0].conclusion === 'success'))
-                  && (!statuses.length || (statuses[0].sha === sha && statuses[0].state === 'success'));
+                  && (!statuses.length || statuses[0].state === 'success');
               });
             }
             {
@@ -266,6 +266,7 @@ jobs:
                     ...await requiredChecks(number, pr.base.ref),
                     comments: await github.paginate(github.rest.issues.listComments, {...repo, issue_number: number, per_page: 100}),
                     checks: await github.paginate(github.rest.checks.listForRef, {...repo, ref: sha, filter: 'latest', per_page: 100}),
+                    // The immutable request ref binds legacy statuses; responses have no sha field.
                     statuses: (await github.paginate(github.rest.repos.listCommitStatusesForRef, {...repo, ref: sha, per_page: 100}))
                       .filter(entry => !['risk-gate', 'pr-template'].includes(entry.context)),
                   });
