@@ -16,6 +16,7 @@ QuantStrategyLab 各仓库共用的组织级文件。
 | [密钥扫描](docs/secret-scanning.md) | 发布前扫描、PR 检查和每周全分支扫描模板。 |
 | `profile/README.md` | 组织 GitHub 主页上显示的介绍。 |
 | `PULL_REQUEST_TEMPLATE.md` | 没有自带模板的仓库默认使用的 pull request 模板。 |
+| [风险门禁自动批准提案](PROPOSAL.md) | AI 审查、agent 清除规则与实盘部署授权。 |
 | `AGENTS.md` | 本仓库的 AI 参与与维护规则。 |
 
 ## 参与贡献
