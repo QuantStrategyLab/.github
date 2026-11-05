@@ -39,8 +39,7 @@ Organization documentation rules are checked by `python scripts/check_style.py`,
 - Developer documentation is English by default; Chinese siblings use
   `.zh-CN.md` and exist only where a reader needs them.
 - New document names are lowercase with hyphens. `README.md`, `AGENTS.md`,
-  `CLAUDE.md` and other tool-defined names keep their spelling. The root
-  `PROPOSAL.md` keeps the filename explicitly requested for this governance decision.
+  `CLAUDE.md` and other tool-defined names keep their spelling.
 - Temporary internal task reports, retrospectives, handoffs and progress
   snapshots stay outside Git. Sanitized research baselines, design decisions,
   financial and accounting contracts, provenance/PIT/license evidence, and
@@ -89,11 +88,18 @@ Organization documentation rules are checked by `python scripts/check_style.py`,
 
 - Commit and PR titles use professional English, imperative Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`) and at most 72 characters. Sentence case is allowed; commitlint ignores merge commits.
 - PR descriptions explain the problem, changes, verification and risk. AI-authored PRs identify the tool and the model when available. Labels and approval or risk summaries use professional English.
-- Use `risk:low` for documentation, tests and ordinary checks; use `risk:high` and `needs-owner-approval` for protected paths. Classification labels describe risk; the path-based `risk-gate` determines whether approval is required.
-- AI-only development uses required automated checks, template validation and independent AI review when available, with zero required human or code-owner approvals. Ordinary high-risk paths need no manual label only when the trusted Codex App's latest `codex-review-state:v1` marker is completed for the exact current head with `has_unresolved_findings=false`, and every required check is green. Missing, stale, malformed, unreadable or changing evidence blocks automatic approval.
-- The owner-only globs in [PROPOSAL.md](PROPOSAL.md#owner-only-paths) retain the existing owner-applied `owner-approved` requirement. They cover secrets, IAM, deployments, trading/execution and broker credentials, plus Kelly, stop-loss and this gate's trust configuration. Renames check both paths; docs and tests cannot exempt these globs. Agents must never add or remove approval labels.
-- Automated path approval satisfies only `risk-gate`; it grants no merge, deployment, trading or configuration authority. The reusable governance shadow observer remains report-only. This proposal affects this repository only until separately adopted elsewhere.
+- Use `risk:low` for documentation, tests and ordinary checks; use `risk:high` for protected paths. Classification labels describe risk and grant no authority.
+- AI-only development uses required automated checks, template validation and the `ai-review` context published from the Codex receipt on the current head; no human or code-owner approval is required, and no change waits on a human label. This includes governance, AI-service, gate and trust-policy source changes. The immutable base policy supplies trusted App IDs; the newest trusted Bot/App marker must be well-formed, completed and exact-head clean, and required checks must be green. Missing or changing evidence blocks clearance. Every PR, including dependency updates, requires AI review; there is no review exemption. High-risk paths require one clearing label, and either label clears `risk-gate`: once the Codex receipt on that head is completed with no unresolved findings and every required context except the label-dependent `risk-gate` is green, an agent may add `agent-approved` itself, record the addition in the ledger, and then wait for `risk-gate` to re-evaluate and pass; the status description then says `NOT confirmed by the owner`. `owner-approved` stays available when the owner chooses to confirm a change personally, and agents must never add or remove it. A review or label that is not on the current head clears nothing.
 - Preserve required checks and branch protection; merge only through normal checks. Use `<type>/<topic>` PR branches; never push directly to the default branch or force-push a reviewed branch. Commit, push, merge and production actions require authorization; existing authorization remains valid within its scope.
+
+## Operational authorization
+
+Only live-trading deployments require owner authorization as the deployment
+touchpoint. Actual Secrets/IAM changes and destructive data/resource deletions
+still escalate to the owner. Source review and merge grant no deployment authority.
+Use the fixed `live-trading` Environment protection described in
+[PROPOSAL.md](PROPOSAL.md#live-deployment-boundary); do not infer an approval from
+a label or a green check. Live trading, Kelly and every stop-loss switch stay OFF.
 
 ## Scope and authorization
 

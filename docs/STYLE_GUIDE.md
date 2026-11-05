@@ -282,14 +282,22 @@ Sentence-case subjects are allowed; commitlint ignores merge commits.
 
 AI-authored PRs identify the tool and the model when available. Labels and risk
 summaries use professional English. Use `risk:low` for documentation, tests and
-ordinary checks; use `risk:high` and `needs-owner-approval` for protected paths.
-The path-based `risk-gate` determines whether owner approval is required;
-classification labels cannot override it.
+ordinary checks; use `risk:high` for protected paths. Classification labels
+never grant approval or operational authority.
 
-Development uses required automated checks, template validation and independent
-AI review when available, with zero required human or code-owner approvals.
-High-risk paths wait for the owner's `owner-approved` label. AI agents must never
-add or remove that label. Existing required checks and protections still apply.
+Development uses required checks, template validation and independent exact-head
+AI review, with zero required human or code-owner approvals. High-risk paths,
+including governance, AI-service and gate/trust source, may use `agent-approved`
+after clean review and green required contexts. Record the addition in the ledger,
+then wait for the installed risk-gate; the label must bind the current head and
+live timeline event. Agents must never add or remove `owner-approved`.
+
+Source merge grants no deploy authority. Live-trading deployments need owner
+authorization through a fixed protected `live-trading` Environment; actual
+Secrets/IAM changes and destructive deletion still escalate to the owner.
+Live trading, Kelly and every stop-loss switch stay OFF. Keep all native required
+checks and branch protection. Other repositories must adopt this gate separately;
+this style-guide update does not change their installed enforcement.
 
 ## 10. Code comments and docstrings
 

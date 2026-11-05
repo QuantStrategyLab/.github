@@ -1,174 +1,151 @@
-# Automated approval for ordinary high-risk paths
+# Agent-cleared source changes and deployment authorization
 
-Status: proposal for owner decision. Opening this Draft PR does not adopt it.
-
-## Problem and rationale
-
-The current path gate requires an owner-applied label for every high-risk
-change, including ordinary strategy, risk and runtime code. It ignores an
-already completed, clean Codex review and passing required checks. The proposed
-policy removes that repeated manual step while keeping owner control over
-sensitive operations and the gate's trust configuration.
+Status: owner-authorized reconciliation; effective only after normal protected
+merge. The current main gate continues to govern this candidate.
 
 ## Decision rule
 
-Low-risk paths retain their existing behavior. For other paths, inspect both
-current and previous filenames before any docs or tests exemption.
+AI reviews and the established merge bot handle every PR. There is no
+filename-based owner-only approval branch, including governance, AI-service,
+gate and trust-policy source changes. Classification still marks sensitive
+paths as high risk; both filenames of a rename are checked.
 
-An ordinary high-risk change passes `risk-gate` only when all of these hold:
+Every PR, including low-risk prose and dependency updates, needs:
 
-1. The newest marker from a trusted Codex App is exactly one well-formed
-   `codex-review-state:v1` comment marker. The App IDs come from the existing
-   policy at the immutable trusted base revision, never the PR's candidate tree.
-2. Its `code_review.commit_sha` equals the current PR head, its status is
-   `completed`, and `has_unresolved_findings` is the boolean `false`.
-   `has_any_findings` must also be a boolean; resolved findings are permitted.
-   A newer running, malformed or unresolved marker supersedes an older clean one.
-3. All required contexts from classic branch protection and applicable rulesets
-   are discovered and successful for the same head. Missing protection evidence,
-   missing results, skipped/neutral checks, wrong App bindings and API errors
-   block automatic approval. Legacy statuses cannot prove an App-bound identity
-   and therefore cannot satisfy such a requirement.
-4. No changed or previous path matches the owner-only list below. An old owner
-   label cannot substitute for missing automated evidence on ordinary high-risk
-   paths.
+1. The newest marker-bearing comment from a trusted Codex Bot/App, using App IDs
+   read from `.github/governance/policy.json` at the immutable base SHA. It must
+   contain exactly one valid `codex-review-state:v1` marker. Comment IDs and times
+   must be valid; a newer malformed marker supersedes an older clean receipt.
+2. A completed review with `commit_sha` equal to the exact current head,
+   boolean `has_any_findings` and `has_unresolved_findings=false`. Resolved
+   findings are permitted. The head must contain the current live base tip,
+   resolved with the branch/compare APIs rather than a cached PR base snapshot.
+3. Successful required contexts discovered from classic protection and applicable
+   rulesets, with exact App binding. Missing, skipped, neutral, pending, wrong-App
+   or unreadable results block clearance. Legacy statuses cannot establish an
+   App-bound identity. `risk-gate`, `pr-template` and `ai-review` are the only
+   self-produced exceptions: this evaluation validates template/review locally
+   and checks their expected publisher App. Every other context remains required.
+4. A complete changed-file list and consistent rereads of PR bindings, filenames,
+   reviews, checks, protection, label events, label receipts and live-base
+   ancestry. Unknown or changing evidence never becomes approval.
 
-`risk-gate` is the output of this decision, so it cannot be its own prerequisite.
-The locally validated `pr-template` result is published before the required-check
-read. These are the only two self-produced contexts; their expected App binding
-is checked. Every other required job stays mandatory. Native branch protection
-and the required-check list stay unchanged.
+High-risk changes also need a head-bound clearing label. After the exact-head
+clean review and all other required contexts are green, an agent may add
+`agent-approved`, record its addition in the ledger and wait for risk-gate.
+The gate then says `NOT confirmed by the owner`. `owner-approved` remains an
+optional personal confirmation; agents must never add or remove it. Neither
+label bypasses review or required checks.
 
-## Owner-only paths
+The separate recorder binds the authenticated label delivery's head, PR number
+and uniquely matched timeline event to `clearing-label`. Evaluation requires the
+same currently live event and the record on the current head. Revoked/re-added,
+stale, delayed or ambiguous same-second events cannot reuse an old receipt.
+Legacy commit statuses remain appendable: the receipt is a head/event binding,
+not a cryptographic attestation of a human or a dedicated publisher. Restrict
+status writers and require the independent review bot's fresh merge readback.
+No token grants or settings are changed by this source patch.
 
-These are the exact implemented globs. Paths are converted from camelCase to
-snake_case and lowercased before matching. `*` stays within one path segment;
-`**/` matches zero or more directory segments. Broad credential, trading and
-infrastructure families intentionally keep ambiguous files under owner control.
-There is no docs, tests, examples or fixtures exemption for this list.
+## Recovery and trust
 
-```text
-**/*secret*
-**/*secret*/**
-**/*credential*
-**/*credential*/**
-**/.env*
-**/*.pem
-**/*.key
-**/*.p12
-**/*.pfx
-**/*iam*
-**/*iam*/**
-**/*service_account*
-**/*service_account*/**
-**/*serviceaccount*
-**/*serviceaccount*/**
-**/*permission*
-**/*permission*/**
-**/*role_binding*
-**/*role_binding*/**
-**/*deploy*
-**/*deploy*/**
-**/*release*
-**/*release*/**
-**/*.tf
-**/*.tfvars
-**/dockerfile*
-**/docker-compose*
-**/compose.y*ml
-**/vercel.json
-**/wrangler.*
-**/firebase.json
-**/k8s/**
-**/kubernetes/**
-**/*trad*
-**/*trad*/**
-**/*execution*
-**/*execution*/**
-**/*executor*
-**/*executor*/**
-**/*order*
-**/*order*/**
-**/*broker*
-**/*broker*/**
-**/*kelly*
-**/*kelly*/**
-**/*stop*loss*
-**/*stop*loss*/**
-.github/governance/**
-.github/workflows/risk-gate.yml
-**/codeowners
+All events resolve to a per-repository/per-PR serialized writer without cancelling
+an active evaluation. Base pushes, the existing six-hour sweep and PR closes
+re-evaluate current open PRs through that same writer. Synchronize also refreshes
+siblings still carrying a shared-head collision error. Different open PRs sharing
+a head are blocked both before and after evidence collection; a closed PR cannot
+publish over its former sibling's statuses.
+
+The discovery matrix replaces self-dispatch for recovery, so `actions: write` is
+unnecessary. The recorder remains independent of the evaluation concurrency group.
+Check/status/comment events and the named native `workflow_run` triggers refresh
+evidence. Maintain the workflow-name list when required native workflows change.
+API errors use fixed redacted diagnostics. No job checks out or executes candidate
+code, reads production secrets, changes labels, merges or deploys.
+
+A passing status is a snapshot, not a transaction with mutable GitHub evidence.
+Native protection and the established merge bot must recheck the exact candidate.
+Offline tests do not prove hosted permissions, event delivery or runtime adoption.
+Unreadable protection APIs block the gate. The shadow observer remains SHADOW,
+with `merge_authorized=false`; its trust and required native contexts are unchanged.
+
+## Live deployment boundary
+
+Source merge is not deployment authority. Only deployment to live trading needs
+owner authorization as the deployment touchpoint; actual Secrets/IAM changes and
+destructive data/resource deletions still escalate to the owner. Removing a source
+file is not by itself deletion of production data. Live trading, Kelly and all
+stop-loss switches stay OFF. A label, Codex marker or green gate authorizes none
+of these operations.
+
+The following is a concrete **configuration sketch**, not an installed Environment
+or a runnable deployer. Configure a fixed `live-trading` GitHub Environment using
+one numeric owner reviewer ID, prevent self-review, disable administrator bypass,
+and permit only protected branches:
+
+```json
+{
+  "wait_timer": 0,
+  "reviewers": [{"type": "User", "id": "<numeric-owner-id>"}],
+  "prevent_self_review": true,
+  "can_admins_bypass": false,
+  "deployment_branch_policy": {
+    "protected_branches": true,
+    "custom_branch_policies": false
+  }
+}
 ```
 
-The list includes the gate itself, its trust policy and CODEOWNERS because a PR
-must not grant itself authority by modifying those files. Broker, order and
-execution paths stay owner-only even when a filename does not say live. Kelly
-and stop-loss paths stay protected; this proposal enables no trading feature.
-Other workflow changes still require the automated high-risk rule.
+Replace the placeholder with an actual number only in the authorized settings
+operation. Verify plan/feature support first. The initiating agent must use its
+own App/bot identity: a shared owner login cannot prove human approval and may
+prevent the owner from approving their own run.
 
-Owner-only paths retain the existing verified owner-label event predicate.
-This proposal neither strengthens that legacy human-identity proof nor allows
-an agent to add/remove a label. A label is not operational authorization to
-execute a deployment or trade.
+A trusted default-branch deployment workflow must use `workflow_dispatch`, accept
+only a full candidate SHA, reject non-default-branch dispatch and arbitrary
+targets/commands, and serialize deployment with `cancel-in-progress: false`.
+Its credential-free preflight must validate main ancestry, independent review,
+required checks, allowed target and verified artifact provenance/digest; dry-run
+and display the exact target/revision/artifact/plan tuple before approval. The
+live-mutating job must declare the following fixed boundary:
 
-## Execution and evidence freshness
+```yaml
+if: github.ref == 'refs/heads/main'
+environment:
+  name: live-trading
+permissions:
+  contents: read
+  id-token: write
+```
 
-The privileged workflow executes trusted workflow code only. It adds read-only
-check access; status publication remains its only write capability. It never
-checks out or executes a PR, reads secrets, writes labels, merges or deploys.
-The existing shadow observer and its report-only policy are unchanged.
+After Environment approval, revalidate the frozen tuple; any change needs new
+approval. Obtain only an environment-bound OIDC identity and deploy the verified
+artifact through trusted workflow code. If local actions are used, checkout must
+be pinned to the trusted workflow revision with `persist-credentials: false`.
+Read back target revision/state afterward; unknown mutation results must not be
+blindly retried. Approval is for the deployment scope, not each paper trade.
 
-PR/comment/check/status events refresh evidence. The existing native CI workflows
-also trigger reevaluation through `workflow_run`, because GitHub Actions check
-events do not reliably trigger other workflows. The explicit workflow-name list
-must be maintained if required native workflows are renamed or added. A manual
-workflow dispatch remains an existing recovery entry, with no new schedule.
+The cloud OIDC trust/role must bind repository, environment and the trusted
+workflow identity/revision; no equivalent production secret or role may be
+available outside the protected job. A required workflow policy check, executed
+from independently protected trusted code, must reject missing/variable
+Environments, production credentials/OIDC in other jobs, candidate-code execution
+with production authority, extra triggers/targets and changes to the deployment
+trust boundary. YAML alone cannot enforce cloud trust. Settings/trust writes must
+remain outside implementation and merge agents' authority. Actual Secrets/IAM
+changes and destructive deletion use similarly owner-protected scoped workflows.
+This PR creates no Environment, cloud binding, workflow deployer or settings.
 
-A read-only discovery job resolves every event to PR numbers. All event types
-then share one concurrency group per PR without cancellation. Replaced pending
-events evaluate the same PR; unrelated PRs never replace each other in the queue.
-Each evaluation reconstructs evidence after restart; no persisted approval is
-reused. It rereads PR head/base/body/labels, changed paths, owner events or
-review/check/protection evidence before publishing. A mismatch or read failure
-blocks the decision. API exception text and user bodies are never logged.
+## Adoption and verification
 
-The final status is a snapshot, not a transaction with GitHub's mutable evidence.
-Events refresh it and native branch protection still enforces checks at merge.
-No local test proves hosted token permissions, event delivery or runtime adoption.
-If protection APIs are unreadable to the installed token, the gate blocks;
-this Draft PR requests no settings or permission changes outside workflow scope.
+This change applies only to this metadata repository until separately adopted.
+The organization style guide documents the recommended contract; copying prose
+does not change another repository's installed gate. Existing required checks
+and branch protection remain mandatory. The root `PROPOSAL.md` naming exception
+from the base is retained without widening other naming rules.
 
-## Scope and adoption
-
-Only this organization's metadata repository changes. Other repositories and
-callers pinned to older revisions do not adopt this proposal automatically.
-The workflow diff, local rules, tests and this decision document form one review
-unit. The root filename `PROPOSAL.md` is explicitly requested for this decision;
-the naming checker permits only this root path, while nested uppercase proposal
-filenames remain invalid. No security or identifier rule is relaxed.
-
-This PR stays Draft for the owner's decision and the established review bot.
-The current base-branch risk gate still governs this PR. Opening it does not
-satisfy its own approval gate and does not authorize merge, undraft, labels,
-repository/organization settings, deployment or live activation.
-
-## Validation
-
-`node --test scripts/test-risk-gate.cjs` executes the actual embedded workflow
-script with fake native API data. It checks the positive decision, invalid or
-stale review markers, required checks and App identities, protected paths,
-renames, event routing, read failures, redaction, concurrent evaluations and
-snapshot drift. The existing CI test job runs these tests alongside the shadow
-engine tests. Run all available Python checker/scanner tests and the phase-2 docs
-checker before publication. The PR description records the actual results.
-
-## Rollback
-
-Through a separately authorized reviewed change, restore the previous
-`risk-gate.yml` and the corresponding AGENTS approval wording, remove the added
-risk tests from the CI command and revert this proposal's document/name-only
-changes. Keep every existing native required check, the owner-only controls and
-branch protection enabled. Reevaluate affected open PRs under the restored gate
-using its existing workflow-dispatch input; do not reuse successful statuses
-from the proposed policy as proof of legacy owner approval. No deployment,
-settings edit, history rewrite or label change is part of this Draft PR.
+`node --test scripts/test-risk-gate.cjs scripts/test-governance-shadow.cjs` runs
+actual embedded workflow code with fake native APIs. Run all Python style/scanner
+suites, `python scripts/check_style.py --phase 2`, and actionlint when available.
+Report focused/full counts and fail-before/pass-after evidence separately from
+hosted checks. Rollback requires a separately authorized normal reviewed change;
+never force-push, change labels or weaken native protection to roll back.
