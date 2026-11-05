@@ -3,6 +3,13 @@
 Status: owner-authorized reconciliation; effective only after normal protected
 merge. The current main gate continues to govern this candidate.
 
+Superseded 2026-11-06: this reconciled verifier was merged here and in
+QuantAIService and could not converge. Its own check, status and workflow-run
+triggers change the check evidence it rereads, so every evaluation ended in
+`error` and closed both repositories to merges. Both returned to the canonical
+`.github/workflows/risk-gate.yml` that the other 23 repositories run. The text
+below is the record of the proposed design, not the deployed gate.
+
 ## Decision rule
 
 AI reviews and the established merge bot handle every PR. There is no
