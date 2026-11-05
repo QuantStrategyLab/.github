@@ -16,7 +16,7 @@ Organization-wide files for QuantStrategyLab repositories.
 | [Secret scanning](docs/secret-scanning.md) | Publication guard, PR check and weekly all-branch scan templates. |
 | `profile/README.md` | Text shown on the organization's GitHub profile page. |
 | `PULL_REQUEST_TEMPLATE.md` | Default pull request template for repositories without their own. |
-| [Automated risk approval proposal](PROPOSAL.md) | Approval conditions, owner-only paths and rollback. |
+| [Automated risk approval proposal](PROPOSAL.md) | Exact-head review, label-free merges, operational authorization and rollback. |
 | `AGENTS.md` | AI contribution and maintenance rules for this repository. |
 
 ## Contributing

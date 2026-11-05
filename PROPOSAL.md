@@ -1,21 +1,20 @@
-# Automated approval for ordinary high-risk paths
+# Automated approval without owner labels
 
-Status: proposal for owner decision. Opening this Draft PR does not adopt it.
+Status: owner-authorized policy update; effective when merged.
 
 ## Problem and rationale
 
-The current path gate requires an owner-applied label for every high-risk
-change, including ordinary strategy, risk and runtime code. It ignores an
-already completed, clean Codex review and passing required checks. The proposed
-policy removes that repeated manual step while keeping owner control over
-sensitive operations and the gate's trust configuration.
+The previous gate retained an owner-applied label for sensitive paths even with
+a clean exact-head review and passing required checks. All high-risk paths now
+use the same automated evidence rule, including the gate and trust configuration.
+Source review and merge do not grant operational authority.
 
 ## Decision rule
 
 Low-risk paths retain their existing behavior. For other paths, inspect both
 current and previous filenames before any docs or tests exemption.
 
-An ordinary high-risk change passes `risk-gate` only when all of these hold:
+A high-risk change passes `risk-gate` only when all of these hold:
 
 1. The newest marker from a trusted Codex App is exactly one well-formed
    `codex-review-state:v1` comment marker. The App IDs come from the existing
@@ -29,9 +28,8 @@ An ordinary high-risk change passes `risk-gate` only when all of these hold:
    missing results, skipped/neutral checks, wrong App bindings and API errors
    block automatic approval. Legacy statuses cannot prove an App-bound identity
    and therefore cannot satisfy such a requirement.
-4. No changed or previous path matches the owner-only list below. An old owner
-   label cannot substitute for missing automated evidence on ordinary high-risk
-   paths.
+4. No owner label is required for any path class. An existing label cannot
+   substitute for missing review or check evidence.
 
 `risk-gate` is the output of this decision, so it cannot be its own prerequisite.
 The locally validated `pr-template` result is published before the required-check
@@ -39,12 +37,12 @@ read. These are the only two self-produced contexts; their expected App binding
 is checked. Every other required job stays mandatory. Native branch protection
 and the required-check list stay unchanged.
 
-## Owner-only paths
+## Sensitive paths
 
 These are the exact implemented globs. Paths are converted from camelCase to
 snake_case and lowercased before matching. `*` stays within one path segment;
 `**/` matches zero or more directory segments. Broad credential, trading and
-infrastructure families intentionally keep ambiguous files under owner control.
+infrastructure families intentionally require automated review for ambiguous files.
 There is no docs, tests, examples or fixtures exemption for this list.
 
 ```text
@@ -100,16 +98,20 @@ There is no docs, tests, examples or fixtures exemption for this list.
 **/codeowners
 ```
 
-The list includes the gate itself, its trust policy and CODEOWNERS because a PR
-must not grant itself authority by modifying those files. Broker, order and
-execution paths stay owner-only even when a filename does not say live. Kelly
-and stop-loss paths stay protected; this proposal enables no trading feature.
-Other workflow changes still require the automated high-risk rule.
+The list includes the gate itself, its trust policy and CODEOWNERS. These paths
+require the same exact-head clean review and green required checks, never an
+owner label. Trust App IDs are read from the immutable base revision, so a PR
+cannot grant itself trust by changing its candidate policy. Renames check both
+paths, and docs/tests cannot exempt sensitive paths.
 
-Owner-only paths retain the existing verified owner-label event predicate.
-This proposal neither strengthens that legacy human-identity proof nor allows
-an agent to add/remove a label. A label is not operational authorization to
-execute a deployment or trade.
+## Operational authorization
+
+Exact-head-clean merges need no owner label. Agents must never add or remove
+approval labels, force-push or print secrets. Source merge is not deployment
+authority. Live-trading deployments, Secrets/IAM changes and deletions require
+explicit owner authorization in chat, recorded in `_ops/approvals.md` by the
+coordinator. Live trading, Kelly sizing and every stop-loss switch stay OFF
+unless the owner explicitly authorizes them.
 
 ## Execution and evidence freshness
 
@@ -128,7 +130,7 @@ A read-only discovery job resolves every event to PR numbers. All event types
 then share one concurrency group per PR without cancellation. Replaced pending
 events evaluate the same PR; unrelated PRs never replace each other in the queue.
 Each evaluation reconstructs evidence after restart; no persisted approval is
-reused. It rereads PR head/base/body/labels, changed paths, owner events or
+reused. It rereads PR head/base/body/labels, changed paths and
 review/check/protection evidence before publishing. A mismatch or read failure
 blocks the decision. API exception text and user bodies are never logged.
 
@@ -147,10 +149,10 @@ unit. The root filename `PROPOSAL.md` is explicitly requested for this decision;
 the naming checker permits only this root path, while nested uppercase proposal
 filenames remain invalid. No security or identifier rule is relaxed.
 
-This PR stays Draft for the owner's decision and the established review bot.
-The current base-branch risk gate still governs this PR. Opening it does not
-satisfy its own approval gate and does not authorize merge, undraft, labels,
-repository/organization settings, deployment or live activation.
+The current base-branch gate governs this PR until merge. The owner's bounded
+bootstrap authorization may satisfy that legacy gate for this exact PR/head;
+it does not become an ongoing label requirement or authorize other operations.
+Normal required checks and exact-head review remain mandatory.
 
 ## Validation
 
@@ -164,11 +166,9 @@ checker before publication. The PR description records the actual results.
 
 ## Rollback
 
-Through a separately authorized reviewed change, restore the previous
-`risk-gate.yml` and the corresponding AGENTS approval wording, remove the added
-risk tests from the CI command and revert this proposal's document/name-only
-changes. Keep every existing native required check, the owner-only controls and
-branch protection enabled. Reevaluate affected open PRs under the restored gate
-using its existing workflow-dispatch input; do not reuse successful statuses
-from the proposed policy as proof of legacy owner approval. No deployment,
-settings edit, history rewrite or label change is part of this Draft PR.
+Through a separately authorized reviewed change, restore the previous gate and
+its corresponding rules, documentation and tests together. Keep every native
+required check and branch protection enabled. Reevaluate affected open PRs under
+the restored gate using its existing workflow-dispatch input; do not reuse old
+successful statuses as proof of a current decision. No deployment, settings edit,
+history rewrite or label change is part of this policy update.

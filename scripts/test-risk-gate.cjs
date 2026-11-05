@@ -4,10 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const workflow = fs.readFileSync(process.env.RISK_WORKFLOW || path.join(__dirname, '../.github/workflows/risk-gate.yml'), 'utf8');
 const script = workflow.split('          script: |\n').at(-1).split('\n').map(x => x.slice(12)).join('\n');
-// Substitute only the legacy identity literal so fixtures contain no real owner.
-const testScript = script.replace(/(latest\.actor\?\.login === ')[^']+(')/, '$1<PROJECT_ID>-owner$2');
-assert.notEqual(testScript, script, 'Legacy owner predicate must remain present');
-const execute = new (Object.getPrototypeOf(async function(){}).constructor)('github', 'context', 'core', 'process', testScript);
+const execute = new (Object.getPrototypeOf(async function(){}).constructor)('github', 'context', 'core', 'process', script);
 const discoveryScript = workflow.split('          script: |\n')[1].split('\n\n  evaluate:')[0].split('\n').map(x => x.slice(12)).join('\n');
 const discover = new (Object.getPrototypeOf(async function(){}).constructor)('github', 'context', 'core', 'process', discoveryScript);
 const H = 'a'.repeat(40), B = 'b'.repeat(40);
@@ -39,7 +36,7 @@ async function run(f = fixture()) {
     issues: {listComments: 'comments', listEvents: 'events'},
     checks: {listForRef: 'checks'}, repos: {listCommitStatusesForRef: 'statuses',
       getBranchRules: 'rules', listPullRequestsAssociatedWithCommit: 'associated',
-      getContent: async () => ({data: {encoding: 'base64', content: Buffer.from(JSON.stringify(read('policy'))).toString('base64')}}),
+      getContent: async params => {f.policyRefs?.push(params.ref); return {data: {encoding: 'base64', content: Buffer.from(JSON.stringify(read('policy'))).toString('base64')}};},
       createCommitStatus: async params => {if (f.apiError === 'publish') throw new Error('private diagnostic <PROJECT_ID>'); out.statuses.push(params);}}},
     paginate: async (method, params) => {
       if (method === 'statuses') out.statusRefs.push(params.ref);
@@ -86,13 +83,17 @@ for (const filename of ['docs/secrets.md', 'tests/deploy/test.js', 'src/iam/poli
   'src/broker_credentials.json', '.env.local', 'infra/main.tf', '.github/workflows/deploy.yml',
   'src/liveTrading.js', 'src/stop_loss.js', 'src/kelly.py', 'src/orders/run.js',
   '.github/governance/policy.json', '.github/workflows/risk-gate.yml']) {
-  test(`Owner-only path cannot use automatic approval: ${filename}`, async () => {
+  test(`Sensitive path passes without an owner label: ${filename}`, async () => {
     const f = fixture(); f.files[0].filename = filename;
+    assert.equal((await run(f)).risk, 'success');
+    f.comments = [];
     assert.notEqual((await run(f)).risk, 'success');
   });
 }
-test('Renaming an owner-only file to ordinary code keeps owner approval', async () => {
+test('Renaming a sensitive file still requires exact-head review', async () => {
   const f = fixture(); f.files[0].status = 'renamed'; f.files[0].previous_filename = 'src/secrets.js';
+  assert.equal((await run(f)).risk, 'success');
+  f.comments = [];
   assert.notEqual((await run(f)).risk, 'success');
 });
 for (const mutation of ['failure', 'skipped', 'neutral', 'pending', 'missing', 'wrong-app', 'stale', 'newer-failure', 'status-pending']) {
@@ -188,7 +189,7 @@ test('Status publication errors never expose API diagnostics', async () => {
   assert.notEqual(out.risk, 'success'); assert.ok(!JSON.stringify(out).includes('private diagnostic'));
   assert.ok(out.failures.length);
 });
-test('Owner globs escape literal dots', async () => {
+test('Sensitive path globs escape literal dots', async () => {
   const f = fixture(); f.files[0].filename = 'src/notXkey';
   assert.equal((await run(f)).risk, 'success');
 });
@@ -221,18 +222,35 @@ test('A ruleset without classic protection can authorize when every check is gre
     required_status_checks: [{context: 'Unit tests', integration_id: 23456}]}}];
   assert.equal((await run(f)).risk, 'success');
 });
-test('Owner-only paths retain the existing owner-label event predicate', async () => {
-  const f = fixture(); f.files[0].filename = 'src/secrets.js'; f.pr.labels = [{name: 'owner-approved'}];
-  f.events = [{id: 1, event: 'labeled', label: {name: 'owner-approved'}, actor: {login: '<PROJECT_ID>-owner'}}];
+for (const filename of ['.github/workflows/risk-gate.yml', '.github/governance/policy.json', 'src/secrets.js']) {
+  test(`Labels cannot bypass exact-head evidence on sensitive paths: ${filename}`, async () => {
+    const f = fixture(); f.files[0].filename = filename;
+    f.pr.labels = [{name: 'owner-approved'}];
+    assert.equal((await run(f)).risk, 'success');
+    f.comments = [];
+    assert.notEqual((await run(f)).risk, 'success');
+    f.comments = fixture().comments; f.checks[0].conclusion = 'failure';
+    assert.notEqual((await run(f)).risk, 'success');
+  });
+}
+test('Gate trust comes from the immutable base revision', async () => {
+  const f = fixture(); f.files[0].filename = '.github/governance/policy.json';
+  f.policyRefs = [];
   assert.equal((await run(f)).risk, 'success');
-  f.events.push({id: 2, event: 'unlabeled', label: {name: 'owner-approved'}, actor: {login: '<PROJECT_ID>-owner'}});
+  assert.deepEqual(f.policyRefs, [B]);
+});
+test('Sensitive paths fail closed across concurrent review changes and restart', async () => {
+  const f = fixture(); f.files[0].filename = '.github/workflows/risk-gate.yml';
+  f.changed = {comments: []};
+  assert.notEqual((await run(f)).risk, 'success');
+  f.comments = []; delete f.changed;
   assert.notEqual((await run(f)).risk, 'success');
 });
-test('Owner-label event revocation during evaluation blocks the old approval', async () => {
-  const f = fixture(); f.files[0].filename = 'src/secrets.js'; f.pr.labels = [{name: 'owner-approved'}];
-  f.events = [{id: 1, event: 'labeled', label: {name: 'owner-approved'}, actor: {login: '<PROJECT_ID>-owner'}}];
-  f.changed = {events: [...f.events, {id: 2, event: 'unlabeled', label: {name: 'owner-approved'}}]};
-  assert.notEqual((await run(f)).risk, 'success');
+test('Sensitive path API errors remain redacted', async () => {
+  const f = fixture(); f.files[0].filename = 'src/secrets.js'; f.apiError = 'comments';
+  const out = await run(f);
+  assert.notEqual(out.risk, 'success');
+  assert.ok(!JSON.stringify(out).includes('private diagnostic'));
 });
 test('Ordinary high-risk paths cannot use a legacy owner label to bypass review', async () => {
   const f = fixture(); f.pr.labels = [{name: 'owner-approved'}]; f.comments = [];

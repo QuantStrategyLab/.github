@@ -89,9 +89,9 @@ jobs:
             const hash = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
             const target = `${context.serverUrl}/${repo.owner}/${repo.repo}/actions/runs/${context.runId}`;
             const number = Number(process.env.PR_NUMBER);
-            // Explicit owner-only globs: match normalized lowercase snake_case paths.
+            // Sensitive-path globs: match normalized lowercase snake_case paths.
             // * never crosses /; ** does. No docs/tests exemption applies to this list.
-            const ownerOnlyGlobs = [
+            const sensitiveGlobs = [
               '**/*secret*', '**/*secret*/**', '**/*credential*', '**/*credential*/**',
               '**/.env*', '**/*.pem', '**/*.key', '**/*.p12', '**/*.pfx',
               '**/*iam*', '**/*iam*/**', '**/*service_account*', '**/*service_account*/**',
@@ -120,7 +120,7 @@ jobs:
               }
               return new RegExp(pattern + '$').test(normalize(path));
             }
-            const ownerOnly = path => ownerOnlyGlobs.some(glob => matchesGlob(path, glob));
+            const sensitivePath = path => sensitiveGlobs.some(glob => matchesGlob(path, glob));
             function highRisk(path) {
               const p = path.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
               if (p.startsWith('.github/workflows/') || /(^|\/)codeowners$/.test(p)) return true;
@@ -241,23 +241,11 @@ jobs:
                 };
                 const files = await readFiles();
                 const paths = files.flatMap(file => [file.filename, file.previous_filename].filter(Boolean));
-                const protectedPath = paths.some(ownerOnly);
+                const protectedPath = paths.some(sensitivePath);
                 const risky = protectedPath || paths.some(highRisk);
                 let approved = false;
                 let before, after;
-                if (protectedPath) {
-                  const readEvents = async () => github.paginate(github.rest.issues.listEvents,
-                    {...repo, issue_number: number, per_page: 100});
-                  before = await readEvents();
-                  if (pr.labels.some(label => label.name === 'owner-approved')) {
-                    const events = before;
-                    const latest = events.filter(event => ['labeled', 'unlabeled'].includes(event.event)
-                      && event.label?.name === 'owner-approved').sort((a, b) => b.id - a.id)[0];
-                    // A shared GitHub identity cannot distinguish the owner from their AI agents.
-                    approved = latest?.event === 'labeled' && latest.actor?.login === 'Pigbibi';
-                  }
-                  after = await readEvents();
-                } else if (risky) {
+                if (risky) {
                   const {data: content} = await github.rest.repos.getContent({...repo,
                     path: '.github/governance/policy.json', ref: pr.base.sha});
                   if (content.encoding !== 'base64' || typeof content.content !== 'string') fail();
@@ -281,7 +269,6 @@ jobs:
                     || JSON.stringify(before) !== JSON.stringify(after)) fail();
                 const allowed = !risky || approved;
                 await status('risk-gate', allowed ? 'success' : 'failure', !risky ? 'Low-risk paths: no owner approval needed'
-                  : protectedPath ? (approved ? 'Owner-only paths: existing owner label verified' : 'Owner-only paths: owner approval required')
                   : approved ? 'Exact-head clean review and required checks verified' : 'Automatic approval blocked: review or required checks incomplete');
                 if (!allowed || !templateOK) core.setFailed('Required PR governance checks did not pass');
               } catch {

@@ -282,14 +282,20 @@ Sentence-case subjects are allowed; commitlint ignores merge commits.
 
 AI-authored PRs identify the tool and the model when available. Labels and risk
 summaries use professional English. Use `risk:low` for documentation, tests and
-ordinary checks; use `risk:high` and `needs-owner-approval` for protected paths.
-The path-based `risk-gate` determines whether owner approval is required;
-classification labels cannot override it.
+ordinary checks; use `risk:high` for sensitive paths. Classification labels
+describe risk and do not grant authority. In this repository, `risk-gate` uses
+exact-head review and required checks for all high-risk paths without an owner
+label. Other repositories adopt that policy only through separate reviewed changes.
 
 Development uses required automated checks, template validation and independent
 AI review when available, with zero required human or code-owner approvals.
-High-risk paths wait for the owner's `owner-approved` label. AI agents must never
-add or remove that label. Existing required checks and protections still apply.
+Exact-head-clean merges in this repository need no owner approval label, including
+gate and trust configuration changes. Agents must never add or remove approval
+labels, force-push or print secrets. Existing required checks and protections
+still apply. Source merge does not authorize operations: live-trading deployments,
+Secrets/IAM changes and deletions require explicit owner authorization in chat,
+recorded by the coordinator in `_ops/approvals.md`. Live trading, Kelly sizing and
+every stop-loss switch stay OFF unless explicitly authorized by the owner.
 
 ## 10. Code comments and docstrings
 
