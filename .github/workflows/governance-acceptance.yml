@@ -10,6 +10,10 @@ on:
         description: Same immutable central commit as the reusable workflow reference
         required: true
         type: string
+      require-codex-marker:
+        description: Fail this observation when the exact-head Codex prerequisite is absent
+        default: false
+        type: boolean
       mode:
         default: SHADOW
         type: string
@@ -31,6 +35,7 @@ jobs:
           PR_NUMBER: ${{ inputs.pr-number }}
           POLICY_REVISION: ${{ inputs.policy-revision }}
           MODE: ${{ inputs.mode }}
+          REQUIRE_CODEX_MARKER: ${{ inputs.require-codex-marker }}
         with:
           script: |
             // Trusted reusable workflow code only; never load candidate source.
@@ -40,10 +45,13 @@ jobs:
             const number = Number(process.env.PR_NUMBER);
             const fail = code => { throw new Error(code); };
             const hash = value => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+            const markerInput = process.env.REQUIRE_CODEX_MARKER;
+            const markerRequired = markerInput === 'true';
             let report = {schema_version: 1, mode: 'SHADOW', merge_authorized: false,
+              codex_prerequisite: markerRequired || !['true', 'false'].includes(markerInput) ? 'BLOCKED' : 'NOT_REQUIRED',
               observation: 'UNKNOWN', reason: 'READ_OR_INTEGRITY_FAILURE'};
             try {
-              if (process.env.MODE !== 'SHADOW' || !hash(revision)
+              if (!['true', 'false'].includes(markerInput) || process.env.MODE !== 'SHADOW' || !hash(revision)
                   || !Number.isSafeInteger(number) || number < 1) fail('INVALID_INPUT');
               const {data: content} = await github.rest.repos.getContent({owner: 'QuantStrategyLab',
                 repo: '.github', path: '.github/governance/policy.json', ref: revision});
@@ -197,6 +205,12 @@ jobs:
                 semantic_classification: 'HEURISTIC_NOT_ACCEPTANCE', required_checks: 'NOT_EVALUATED',
                 event_freshness: 'SNAPSHOT_ONLY', baseline_exception: 'UNSUPPORTED',
                 codex_observation: codexObservation(evidence.comments)};
+              if (markerRequired) {
+                report.codex_prerequisite = ['NO_REPORTED_FINDINGS', 'FINDINGS_REPORTED']
+                  .includes(report.codex_observation) ? 'SATISFIED' : 'BLOCKED';
+                if (report.codex_prerequisite !== 'SATISFIED')
+                  core.setFailed('Exact-head Codex review prerequisite is not satisfied');
+              }
             } catch {
               // Deliberately omit exception text, paths, patches, user bodies and API response data.
               report = {...report, observation: 'UNKNOWN', reason: 'READ_OR_INTEGRITY_FAILURE'};

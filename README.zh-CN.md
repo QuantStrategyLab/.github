@@ -23,3 +23,5 @@ QuantStrategyLab 各仓库共用的组织级文件。
 提交 pull request，说明要解决的问题、改了什么，以及对现有仓库的影响。AI 助手与维护者遵循 [AGENTS.md](AGENTS.md)。
 
 - [Governance shadow engine](docs/governance-shadow.md) — reusable report-only review observations.
+
+- [协作规则草案](docs/collaboration-governance.md)
