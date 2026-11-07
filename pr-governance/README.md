@@ -64,7 +64,10 @@ organization community-health files.
    `reviewer` and repository-specific `r2_paths`. Leave `owner` out: account
    identities belong in protected configuration, so the action reads
    `RISK_GATE_OWNER_ID` and `RISK_GATE_OWNER` from repository or organization
-   variables and replaces `owner` when they are set.
+   variables and replaces `owner` when they are set. A repository whose content
+   rules keep accounts out of public source may also leave `reviewer` out and
+   set `RISK_GATE_REVIEWER_APP_ID`, `RISK_GATE_REVIEWER_USER_ID` and
+   `RISK_GATE_REVIEWER_LOGIN` instead; a partial set fails closed.
 2. Copy `templates/risk-gate.yml`, `templates/codex-nudge.yml`,
    `templates/gitleaks.yml` and `templates/weekly-secret-scan.yml` into
    `.github/workflows/`, replacing `__GOVERNANCE_REPO__` with the
@@ -82,7 +85,8 @@ organization community-health files.
 
 The owner identity comes from the `RISK_GATE_OWNER_ID` and `RISK_GATE_OWNER`
 variables. A policy that still carries `owner` keeps working until the
-variables are set, but no account identity is required in the file.
+variables are set, but no account identity is required in the file. The
+reviewer follows the same rule through the `RISK_GATE_REVIEWER_*` variables.
 
 ## Trust model
 
