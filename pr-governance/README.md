@@ -23,6 +23,10 @@ A pull request may merge when all of these hold:
 Branch protection, not this action, is the merge constraint. The action only
 publishes evidence; it cannot merge, label, or write repository contents.
 
+The gate applies to repositories that build, deploy or run code. A repository
+that only publishes a static site through a `pages` workflow keeps that
+deployment workflow and is exempt from the gate.
+
 ## Risk tiers
 
 | Tier | Typical paths | Requirement |
@@ -124,6 +128,15 @@ a fresh review instead of silently reusing one.
 ## Private repositories
 
 GitHub Free does not provide branch protection or secret scanning for private
-repositories, and hosted Actions may be billing-blocked. Use the local track:
-the same policy file, a pre-push hook and `scripts/local` commands recording
-the same receipt and scan results locally. See `docs/private-repositories.md`.
+repositories, and hosted Actions may be billing-blocked. Private repositories
+use a local enforcement track instead: Git hooks that reject staged credentials,
+unconventional commit headers, direct pushes to a protected branch, and
+non-fast-forward pushes, plus an audit over the tracked tree.
+
+
+## Twin repositories
+
+`pr-governance/` is byte-identical in `Pigbibi/governance`, `GdeiAssistant/.github`
+and `QuantStrategyLab/.github`; `VERSION` names the shared revision. Each
+repository runs `scripts/check-twin-drift.sh` weekly and on demand. A change to
+any shared file is applied to all three before the drift check can pass.
