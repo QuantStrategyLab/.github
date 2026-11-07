@@ -146,6 +146,25 @@ test('a comment on an issue that is not a pull request evaluates nothing', async
   assert.deepEqual(await runner.selectTargets(m.github, m.context, 'main'), [8]);
 });
 
+test('a review relay evaluates the pull requests named by the run', async () => {
+  const m = mock(fixture(), { eventName: 'workflow_run' });
+  m.context.payload = { workflow_run: { pull_requests: [{ number: 42 }, { number: 7 }, { number: 42 }] } };
+  assert.deepEqual(await runner.selectTargets(m.github, m.context, 'main'), [42, 7]);
+  m.context.payload = { workflow_run: { pull_requests: [{ number: 0 }, { number: 'x' }] } };
+  assert.deepEqual(await runner.selectTargets(m.github, m.context, 'main'), []);
+});
+
+test('a review relay without pull request entries falls back to the head branch', async () => {
+  const m = mock(fixture(), { eventName: 'workflow_run', open: [{ number: 42 }] });
+  m.context.payload = { workflow_run: { pull_requests: [], head_repository: { owner: { login: 'example-org' } }, head_branch: 'feature' } };
+  assert.deepEqual(await runner.selectTargets(m.github, m.context, 'main'), [42]);
+  assert.equal(m.calls.at(-1).params.head, 'example-org:feature');
+  m.context.payload = { workflow_run: { pull_requests: [], head_branch: 'feature' } };
+  assert.deepEqual(await runner.selectTargets(m.github, m.context, 'main'), []);
+  m.context.payload = {};
+  await assert.rejects(runner.selectTargets(m.github, m.context, 'main'), /workflow run payload/);
+});
+
 test('dispatch validates the number and the default branch', async () => {
   const m = mock(fixture(), { eventName: 'workflow_dispatch' });
   m.context.payload = { inputs: { pr_number: '42' } };
@@ -168,6 +187,8 @@ test('review threads paginate to the last page and refuse a repeating cursor', a
   let page = 0;
   m.github.graphql = async (query, params) => {
     page++;
+    // `Actor` has no databaseId field; asking for one makes every evaluation fail.
+    assert.doesNotMatch(query, /databaseId/);
     assert.equal(params.cursor, page === 1 ? null : 'cursor1');
     return { repository: { pullRequest: { reviewThreads: {
       nodes: [{ id: `thread-${page}`, isResolved: page === 1, comments: { nodes: [{ author: { login: 'agent' } }] } }],

@@ -36,6 +36,22 @@ async function selectTargets(github, context, defaultBranch) {
     if (!Number.isSafeInteger(event.issue.number) || event.issue.number < 1) throw new Error('Invalid PR number');
     return [event.issue.number];
   }
+  if (context.eventName === 'workflow_run') {
+    // Reviews on fork and Dependabot pull requests arrive through a
+    // permissionless signal workflow; only its completion is trusted here.
+    const run = event.workflow_run;
+    if (!run) throw new Error('Missing workflow run payload');
+    const listed = Array.isArray(run.pull_requests) ? run.pull_requests : [];
+    const numbers = listed
+      .map(item => item?.number)
+      .filter(number => Number.isSafeInteger(number) && number > 0);
+    if (numbers.length) return [...new Set(numbers)];
+    const owner = run.head_repository?.owner?.login;
+    if (!owner || typeof run.head_branch !== 'string' || !run.head_branch) return [];
+    const pulls = await github.paginate(github.rest.pulls.list,
+      { ...repo, state: 'open', base: defaultBranch, head: `${owner}:${run.head_branch}`, per_page: 100 });
+    return pulls.map(pull => pull.number);
+  }
   if (context.eventName === 'workflow_dispatch') {
     if (context.ref !== `refs/heads/${defaultBranch}`) throw new Error('Dispatch must use the default branch');
     const number = Number(event.inputs?.pr_number);
@@ -54,7 +70,7 @@ async function readThreads(github, repo, number) {
     const data = await github.graphql(`query($owner:String!,$repo:String!,$number:Int!,$cursor:String) {
       repository(owner:$owner,name:$repo) { pullRequest(number:$number) {
         reviewThreads(first:100,after:$cursor) {
-          nodes { id isResolved isOutdated comments(first:1) { nodes { author { login databaseId } } } }
+          nodes { id isResolved isOutdated comments(first:1) { nodes { author { login } } } }
           pageInfo { hasNextPage endCursor }
         }
       } }
@@ -64,8 +80,7 @@ async function readThreads(github, repo, number) {
     for (const node of page.nodes) {
       if (!node?.id || typeof node.isResolved !== 'boolean') throw new Error('Invalid review thread');
       threads.push({ id: node.id, isResolved: node.isResolved, isOutdated: node.isOutdated === true,
-        author: { login: node.comments?.nodes?.[0]?.author?.login ?? null,
-          id: node.comments?.nodes?.[0]?.author?.databaseId ?? null } });
+        author: { login: node.comments?.nodes?.[0]?.author?.login ?? null } });
     }
     const next = page.pageInfo.hasNextPage ? page.pageInfo.endCursor : null;
     if (page.pageInfo.hasNextPage && (!next || next === cursor)) throw new Error('Invalid thread page');
