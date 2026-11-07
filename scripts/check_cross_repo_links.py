@@ -56,7 +56,7 @@ ORGS = {
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 # https://github.com/<owner>/<repo>/(blob|tree)/<ref>/<path>
 GH_REF = re.compile(
-    r"https?://github\.com/([^/]+)/([^/]+)/(?:blob|tree)/([^/]+)/(.+?)(?:#.*)?$"
+    r"https?://github\.com/([^/]+)/([^/]+)/(blob|tree)/([^/]+)/(.+?)/?(?:[?#].*)?$"
 )
 SHA = re.compile(r"[0-9a-f]{7,40}")
 
@@ -107,6 +107,31 @@ def tree_files(repo: Path, sha: str) -> set[str]:
     return {line for line in out.split("\n") if line}
 
 
+def tree_dirs(paths: set[str]) -> set[str]:
+    """Every directory that contains at least one tracked file."""
+    dirs: set[str] = set()
+    for path in paths:
+        parts = path.split("/")[:-1]
+        for i in range(1, len(parts) + 1):
+            dirs.add("/".join(parts[:i]))
+    return dirs
+
+
+def target_exists(kind: str, path: str, files: set[str], dirs: set[str]) -> bool:
+    """A `tree/` link names a directory, a `blob/` link names a file.
+
+    GitHub serves `tree/<ref>/<dir>` as a directory listing, so checking it
+    against the file list alone reports every directory link as broken.
+    Relative links may point at either.
+    """
+    path = path.rstrip("/")
+    if kind == "github-tree":
+        return path in dirs
+    if kind == "github-blob":
+        return path in files
+    return path in files or path in dirs
+
+
 def grep_links(repo: Path, sha: str) -> list[tuple[str, int, str]]:
     """Every line of every tracked Markdown file at `sha` that holds a link."""
     out = git(repo, "grep", "-n", "-I", "-E", r"\]\(", sha, "--", "*.md")
@@ -141,6 +166,7 @@ def scan(repos: dict[str, Path]) -> tuple[list[dict], list[dict], int]:
     heads: dict[str, str] = {}
     branches: dict[str, str] = {}
     files: dict[str, set[str]] = {}
+    dirs: dict[str, set[str]] = {}
     for name, repo in repos.items():
         head = remote_head(repo)
         if head is None:
@@ -148,6 +174,7 @@ def scan(repos: dict[str, Path]) -> tuple[list[dict], list[dict], int]:
             continue
         branches[name], heads[name] = head
         files[name] = tree_files(repo, head[1])
+        dirs[name] = tree_dirs(files[name])
 
     broken: list[dict] = []
     unverifiable: list[dict] = []
@@ -182,7 +209,7 @@ def scan(repos: dict[str, Path]) -> tuple[list[dict], list[dict], int]:
                 }
                 if note:
                     unverifiable.append({**record, "reason": note})
-                elif target_path not in files[target_repo]:
+                elif not target_exists(kind, target_path, files[target_repo], dirs[target_repo]):
                     broken.append(record)
     return broken, unverifiable, pinned
 
@@ -193,13 +220,14 @@ def classify(
     """Return (target_repo, target_path, kind, unverifiable_reason)."""
     m = GH_REF.match(url)
     if m:
-        _, target_repo, ref, path = m.groups()
+        _, target_repo, mode, ref, path = m.groups()
         if SHA.fullmatch(ref):
             return target_repo, path, "pinned", "commit sha"
+        kind = f"github-{mode}"
         branch = branches.get(target_repo)
         if branch is not None and ref != branch:
-            return target_repo, path, "github-blob", f"ref {ref} is not the default branch"
-        return target_repo, path, "github-blob", ""
+            return target_repo, path, kind, f"ref {ref} is not the default branch"
+        return target_repo, path, kind, ""
 
     if url.startswith(("http", "#", "mailto")):
         return None
