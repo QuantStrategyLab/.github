@@ -107,6 +107,21 @@ reviewer follows the same rule through the `RISK_GATE_REVIEWER_*` variables.
   reserved for a blocking state, so a head that runs out of slots stays blocked
   instead of silently passing.
 
+## Incomplete diff evidence
+
+GitHub's files endpoint can omit or truncate patches for large text files. The
+collector recovers those patches from the diff media type of an immutable
+`base...head` comparison. It matches each file header and verifies the exact
+addition and deletion counts before evaluating, then repeats collection for
+the normal evidence readback. No pull request code is checked out or executed.
+Binary files, unreadable responses, unrecognised quoted paths, inconsistent
+counts and diffs over 16 MiB remain blocking errors.
+
+Evaluation errors publish a fixed reason code in all three required statuses,
+a warning and the job summary. Arbitrary exception text and API response bodies
+are never included. A rerun cannot repair missing evidence or change a pinned
+action: the consumer must first adopt the reviewed fixed action revision.
+
 ## Modes
 
 `policy.json` `mode` controls the outcome:
