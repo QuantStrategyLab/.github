@@ -14,6 +14,7 @@ Organization-wide files for QuantStrategyLab repositories.
 | [Architecture conventions](docs/architecture-conventions.md) | Guidance for configuration, interfaces, tests and documentation ownership. |
 | [Incremental architecture proposal](docs/adr/0001-incremental-architecture-boundaries.md) | Proposed approach to compatible refactoring and rollback. |
 | [Secret scanning](docs/secret-scanning.md) | Publication guard, PR check and weekly all-branch scan templates. |
+| [Reusable job release](docs/deployment-workflows.md) | OIDC image releases and rollback for Azure Container Apps Jobs and Cloud Run Jobs. |
 | `profile/README.md` | Text shown on the organization's GitHub profile page. |
 | `PULL_REQUEST_TEMPLATE.md` | Default pull request template for repositories without their own. |
 | [Automated risk approval proposal](PROPOSAL.md) | Agent-cleared source changes and live-deployment authorization. |
