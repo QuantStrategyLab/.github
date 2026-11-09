@@ -1,0 +1,202 @@
+name: Deploy a fixed container job image
+on:
+  workflow_call:
+    inputs:
+      provider:
+        required: true
+        type: string
+      environment:
+        required: true
+        type: string
+      operation:
+        required: true
+        type: string
+permissions: {}
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: release-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+    steps:
+      - name: Sign in to Azure with OIDC
+        if: inputs.provider == 'azure'
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        env:
+          AZURE_CORE_OUTPUT: none
+        with:
+          client-id: ${{ vars.DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.DEPLOY_TENANT_ID }}
+          subscription-id: ${{ vars.DEPLOY_SUBSCRIPTION_ID }}
+      - name: Exchange GitHub OIDC for a Google access token
+        if: inputs.provider == 'gcp'
+        id: gcp
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.DEPLOY_WIF_PROVIDER }}
+          service_account: ${{ vars.DEPLOY_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_lifetime: 600s
+          create_credentials_file: false
+          export_environment_variables: false
+      - name: Verify and update only the job image
+        env:
+          PROVIDER: ${{ inputs.provider }}
+          OPERATION: ${{ inputs.operation }}
+          RESOURCE: ${{ vars.DEPLOY_RESOURCE }}
+          PREVIOUS: ${{ vars.DEPLOY_PREVIOUS_IMAGE }}
+          CANDIDATE: ${{ vars.DEPLOY_CANDIDATE_IMAGE }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.gcp.outputs.access_token }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import copy
+          import json
+          import os
+          import re
+          import subprocess
+          import time
+          from urllib.error import HTTPError
+          from urllib.request import Request, urlopen
+
+
+          def request(path, token, method="GET", body=None):
+              headers = {"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+              data = None if body is None else json.dumps(body).encode()
+              try:
+                  with urlopen(Request(path, data, headers, method=method), timeout=30) as response:
+                      return json.loads(response.read() or "{}")
+              except HTTPError as error:
+                  raise RuntimeError(f"{method} returned HTTP {error.code}") from None
+
+
+          def wait_for(fetch, complete, seconds):
+              deadline = time.monotonic() + seconds
+              while time.monotonic() < deadline:
+                  result = fetch()
+                  if complete(result):
+                      return result
+                  time.sleep(3)
+              raise TimeoutError("Job update was not confirmed before timeout. Read the resource before retrying.")
+
+
+          class AzureJob:
+              readback_seconds = 285
+
+              def __init__(self, resource):
+                  pattern = r"/subscriptions/[0-9a-f-]{36}/resourceGroups/[\w.()-]+/providers/Microsoft\.App/jobs/[\w-]+"
+                  if not re.fullmatch(pattern, resource, re.IGNORECASE):
+                      raise ValueError("Expected an Azure Container Apps Job resource ID")
+                  self.url = "https://management.azure.com" + resource + "?api-version=2025-01-01"
+                  result = subprocess.run(
+                      ["az", "account", "get-access-token", "--query", "accessToken", "-o", "tsv"],
+                      capture_output=True, text=True, check=True,
+                  )
+                  self.token = result.stdout.strip()
+
+              def read(self):
+                  return request(self.url, self.token)
+
+              @staticmethod
+              def template(job):
+                  return job["properties"]["template"]
+
+              @staticmethod
+              def other_config(job):
+                  fields = ("configuration", "environmentId", "workloadProfileName")
+                  return job.get("identity"), {name: job["properties"].get(name) for name in fields}
+
+              @staticmethod
+              def ready(job):
+                  state = job["properties"]["provisioningState"]
+                  if state in {"Failed", "Canceled"}:
+                      raise RuntimeError(f"Azure job provisioning ended with {state}")
+                  return state == "Succeeded"
+
+              def update(self, before, template):
+                  if self.read() != before:
+                      raise RuntimeError("Azure job changed after preflight")
+                  request(self.url, self.token, "PATCH", {"properties": {"template": template}})
+
+
+          class CloudRunJob:
+              readback_seconds = 140
+
+              def __init__(self, resource):
+                  if not re.fullmatch(r"projects/[\w-]+/locations/[\w-]+/jobs/[\w-]+", resource):
+                      raise ValueError("Expected a Cloud Run Job resource name")
+                  self.base = "https://run.googleapis.com/v2/"
+                  self.url = self.base + resource
+                  self.token = os.environ["GOOGLE_ACCESS_TOKEN"]
+
+              def read(self):
+                  return request(self.url, self.token)
+
+              @staticmethod
+              def template(job):
+                  return job["template"]
+
+              @staticmethod
+              def other_config(job):
+                  fields = ("labels", "annotations", "binaryAuthorization", "launchStage")
+                  return {name: job.get(name) for name in fields}
+
+              @staticmethod
+              def ready(job):
+                  state = job["terminalCondition"]["state"]
+                  if state == "CONDITION_FAILED":
+                      raise RuntimeError("Cloud Run job provisioning failed")
+                  return state == "CONDITION_SUCCEEDED" and not job.get("reconciling")
+
+              def update(self, before, template):
+                  fields = ("name", "etag", "labels", "annotations", "binaryAuthorization",
+                            "launchStage", "client", "clientVersion")
+                  body = {name: before[name] for name in fields if name in before}
+                  body["template"] = template
+                  operation = request(self.url, self.token, "PATCH", body)
+                  if "error" in operation:
+                      raise RuntimeError("Cloud Run update operation failed")
+
+
+          def job_containers(template):
+              return template["containers"] if "containers" in template else template["template"]["containers"]
+
+
+          def release(job, previous, candidate, operation):
+              image_pattern = r"[a-z0-9][a-z0-9._/-]*@sha256:[a-f0-9]{64}"
+              if not all(re.fullmatch(image_pattern, image) for image in (previous, candidate)):
+                  raise ValueError("Both images must be registry paths pinned by SHA-256")
+              if previous == candidate or previous.split("@")[0] != candidate.split("@")[0]:
+                  raise ValueError("Expected distinct digests from the same image repository")
+              if operation not in {"deploy", "rollback"}:
+                  raise ValueError("Expected deploy or rollback")
+              expected, target = (previous, candidate) if operation == "deploy" else (candidate, previous)
+              before = job.read()
+              if not job.ready(before):
+                  raise RuntimeError("Job is not ready for an update")
+              template = copy.deepcopy(job.template(before))
+              containers = job_containers(template)
+              if len(containers) != 1 or containers[0]["image"] != expected:
+                  raise RuntimeError("Job must have one container with the expected source image")
+              containers[0]["image"] = target
+              job.update(before, template)
+              def has_target_image(row):
+                  return job.ready(row) and [c["image"] for c in job_containers(job.template(row))] == [target]
+
+              after = wait_for(job.read, has_target_image, job.readback_seconds)
+              if job.template(after) != template or job.other_config(after) != job.other_config(before):
+                  raise RuntimeError("Job configuration changed during the image update")
+              print(f"{operation} verified: fixed image and unchanged job configuration")
+
+
+          provider = {"azure": AzureJob, "gcp": CloudRunJob}.get(os.environ["PROVIDER"])
+          if provider is None:
+              raise ValueError("Expected azure or gcp")
+          release(provider(os.environ["RESOURCE"]), os.environ["PREVIOUS"],
+                  os.environ["CANDIDATE"], os.environ["OPERATION"])
+          PY
