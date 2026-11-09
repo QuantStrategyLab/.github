@@ -14,7 +14,7 @@ QuantStrategyLab 各仓库共用的组织级文件。
 | [架构规范](docs/architecture-conventions.md) | 配置、接口、测试和文档归属的实施建议。 |
 | [渐进架构提案](docs/adr/0001-incremental-architecture-boundaries.md) | 保持兼容的重构与回滚方案。 |
 | [密钥扫描](docs/secret-scanning.md) | 发布前扫描、PR 检查和每周全分支扫描模板。 |
-| [共用作业发布](docs/deployment-workflows.md) | 使用 OIDC 发布及回滚 Azure Container Apps Jobs 和 Cloud Run Jobs 的固定镜像。 |
+| [共用容器发布](docs/deployment-workflows.md) | 使用 OIDC 发布 Azure 和 GCP 作业的固定镜像，以及为内网 Cloud Run Service 发布零流量版本。 |
 | `profile/README.md` | 组织 GitHub 主页上显示的介绍。 |
 | `PULL_REQUEST_TEMPLATE.md` | 没有自带模板的仓库默认使用的 pull request 模板。 |
 | [风险门禁自动批准提案](PROPOSAL.md) | AI 审查、agent 清除规则与实盘部署授权。 |

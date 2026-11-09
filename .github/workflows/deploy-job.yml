@@ -1,4 +1,4 @@
-name: Deploy a fixed container job image
+name: Deploy a fixed container image
 on:
   workflow_call:
     inputs:
@@ -34,7 +34,7 @@ jobs:
           tenant-id: ${{ vars.DEPLOY_TENANT_ID }}
           subscription-id: ${{ vars.DEPLOY_SUBSCRIPTION_ID }}
       - name: Exchange GitHub OIDC for a Google access token
-        if: inputs.provider == 'gcp'
+        if: inputs.provider == 'gcp' || inputs.provider == 'gcp-service'
         id: gcp
         uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
         with:
@@ -44,7 +44,7 @@ jobs:
           access_token_lifetime: 600s
           create_credentials_file: false
           export_environment_variables: false
-      - name: Verify and update only the job image
+      - name: Release and verify the fixed image
         env:
           PROVIDER: ${{ inputs.provider }}
           OPERATION: ${{ inputs.operation }}
@@ -82,7 +82,7 @@ jobs:
                   if complete(result):
                       return result
                   time.sleep(3)
-              raise TimeoutError("Job update was not confirmed before timeout. Read the resource before retrying.")
+              raise TimeoutError("Update was not confirmed before timeout. Read the resource before retrying.")
 
 
           class AzureJob:
@@ -167,12 +167,15 @@ jobs:
               return template["containers"] if "containers" in template else template["template"]["containers"]
 
 
-          def release(job, previous, candidate, operation):
+          def check_images(previous, candidate):
               image_pattern = r"[a-z0-9][a-z0-9._/-]*@sha256:[a-f0-9]{64}"
               if not all(re.fullmatch(image_pattern, image) for image in (previous, candidate)):
                   raise ValueError("Both images must be registry paths pinned by SHA-256")
               if previous == candidate or previous.split("@")[0] != candidate.split("@")[0]:
                   raise ValueError("Expected distinct digests from the same image repository")
+
+
+          def release(job, previous, candidate, operation):
               if operation not in {"deploy", "rollback"}:
                   raise ValueError("Expected deploy or rollback")
               expected, target = (previous, candidate) if operation == "deploy" else (candidate, previous)
@@ -194,9 +197,106 @@ jobs:
               print(f"{operation} verified: fixed image and unchanged job configuration")
 
 
-          provider = {"azure": AzureJob, "gcp": CloudRunJob}.get(os.environ["PROVIDER"])
-          if provider is None:
-              raise ValueError("Expected azure or gcp")
-          release(provider(os.environ["RESOURCE"]), os.environ["PREVIOUS"],
-                  os.environ["CANDIDATE"], os.environ["OPERATION"])
+          def service_exposure(service):
+              return (
+                  service["ingress"],
+                  service.get("invokerIamDisabled", False),
+                  service.get("defaultUriDisabled", False),
+              )
+
+
+          def serving_revision(service):
+              targets = service["trafficStatuses"]
+              if len(targets) != 1 or targets[0].get("percent") != 100 or targets[0].get("tag"):
+                  raise RuntimeError("Expected one untagged serving revision at 100%")
+              return targets[0]["revision"].rsplit("/", 1)[-1]
+
+
+          def service_template(service):
+              template = copy.deepcopy(service["template"])
+              template.pop("revision", None)
+              return template
+
+
+          def service_settled(service):
+              if service.get("reconciling") or service.get("observedGeneration") != service["generation"]:
+                  return False
+              state = service["terminalCondition"]["state"]
+              if state == "CONDITION_FAILED":
+                  raise RuntimeError("Cloud Run service update failed")
+              return state == "CONDITION_SUCCEEDED"
+
+
+          def release_service(resource, previous, candidate, operation):
+              if operation != "deploy":
+                  raise ValueError("Cloud Run Service supports only zero-traffic deploy")
+              if not re.fullmatch(r"projects/[\w-]+/locations/[\w-]+/services/[\w-]+", resource):
+                  raise ValueError("Expected a Cloud Run Service resource name")
+              url = "https://run.googleapis.com/v2/" + resource
+              token = os.environ["GOOGLE_ACCESS_TOKEN"]
+
+              def read():
+                  return request(url, token)
+
+              before = read()
+              if not service_settled(before):
+                  raise RuntimeError("Cloud Run service is not ready for an update")
+              exposure = service_exposure(before)
+              if exposure[:2] != ("INGRESS_TRAFFIC_INTERNAL_ONLY", False):
+                  raise RuntimeError("Expected internal ingress with invoker IAM enabled")
+              baseline = serving_revision(before)
+              if any(target.get("tag") for target in before.get("traffic", [])):
+                  raise RuntimeError("Expected a service without traffic tags")
+              template = service_template(before)
+              containers = template["containers"]
+              if len(containers) != 1 or containers[0]["image"] != previous:
+                  raise RuntimeError("Service must have one container with the expected source image")
+              containers[0]["image"] = candidate
+              pinned_traffic = [
+                  {"type": "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", "revision": baseline, "percent": 100}
+              ]
+              request(url + "?updateMask=template,traffic", token, "PATCH", {
+                  "name": resource,
+                  "etag": before["etag"],
+                  "template": template,
+                  "traffic": pinned_traffic,
+              })
+              after = wait_for(read, lambda service: service["generation"] != before["generation"]
+                               and service_settled(service), 180)
+              if service_template(after) != template or service_exposure(after) != exposure:
+                  raise RuntimeError("Service template or exposure differs from the requested release")
+              if serving_revision(after) != baseline or after["traffic"] != pinned_traffic:
+                  raise RuntimeError("Serving revision changed or traffic was not pinned")
+
+              revision = after["latestCreatedRevision"].rsplit("/", 1)[-1]
+              if revision in {baseline, before["latestCreatedRevision"].rsplit("/", 1)[-1]}:
+                  raise RuntimeError("No new zero-traffic revision was created")
+              # Untagged zero-traffic revisions can be retired without becoming latestReadyRevision.
+              deployed = request(url + "/revisions/" + revision, token)
+              digest = candidate.rsplit("@", 1)[-1]
+              conditions = {condition["type"]: condition["state"] for condition in deployed["conditions"]}
+              if (deployed["containers"][0]["image"].rsplit("@", 1)[-1] != digest
+                  or conditions.get("ContainerReady") != "CONDITION_SUCCEEDED"
+                  or conditions.get("Ready") != "CONDITION_SUCCEEDED"):
+                  raise RuntimeError("Candidate image or revision condition was not confirmed")
+              print("Deploy verified: candidate at 0%, serving revision at 100%, exposure unchanged")
+
+
+          def main():
+              provider = os.environ["PROVIDER"]
+              resource = os.environ["RESOURCE"]
+              previous, candidate = os.environ["PREVIOUS"], os.environ["CANDIDATE"]
+              operation = os.environ["OPERATION"]
+              check_images(previous, candidate)
+              if provider == "gcp-service":
+                  release_service(resource, previous, candidate, operation)
+              else:
+                  job = {"azure": AzureJob, "gcp": CloudRunJob}.get(provider)
+                  if job is None:
+                      raise ValueError("Expected azure, gcp, or gcp-service")
+                  release(job(resource), previous, candidate, operation)
+
+
+          if __name__ == "__main__":
+              main()
           PY
