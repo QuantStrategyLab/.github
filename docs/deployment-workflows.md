@@ -20,7 +20,8 @@ Set the following variables in that environment. Use one environment per target.
 
 Use the `verify` operation to check OIDC and the expected current image
 without changing the resource. Set `DEPLOY_PREVIOUS_IMAGE` to the expected
-current image. A candidate image is required only for deploy or rollback.
+current image. On a Service, both the configured template and the serving
+revision must match. A candidate image is required only for deploy or rollback.
 Verify checks access to read the target. Test image updates on a separate
 isolated environment before enabling production releases.
 

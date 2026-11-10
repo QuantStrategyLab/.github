@@ -106,9 +106,13 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
         self.workflow["request"].assert_not_called()
 
     def test_service_verify_reads_without_updating(self):
-        api = self.release([self.before], operation="verify")
-        api.assert_called_once()
-        self.assertEqual(api.call_args.args[0], URL)
+        revision = {"containers": [{"image": PREVIOUS}]}
+        api = self.release([self.before, revision], operation="verify")
+        self.assertEqual([call.args[0] for call in api.call_args_list], [URL, URL + "/revisions/" + BASELINE])
+
+    def test_service_verify_rejects_staged_image_when_different_image_serves(self):
+        with self.assertRaisesRegex(RuntimeError, "Serving revision"):
+            self.release([self.before, self.revision], operation="verify")
 
     def test_job_verify_requires_only_current_image_and_does_not_update(self):
         job = Mock()
