@@ -26,8 +26,10 @@ Existing variable-based callers remain supported.
 
 Use the `verify` operation to check OIDC and the expected current image
 without changing the resource. Set `DEPLOY_PREVIOUS_IMAGE` to the expected
-current image. On a Service, both the configured template and the serving
-revision must match. A candidate image is required only for deploy or rollback.
+current image. On a Service, verify checks the serving revision, including
+when the template already holds a zero-traffic candidate. A Service deploy
+requires both the serving revision and the configured template to match the
+expected source image. A candidate image is required only for deploy or rollback.
 Verify checks access to read the target. Test image updates on a separate
 isolated environment before enabling production releases.
 

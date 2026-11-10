@@ -41,6 +41,7 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
         self.workflow = {"__name__": "release_workflow"}
         exec(compile(dedent(script), str(WORKFLOW), "exec"), self.workflow)
         self.before = service_before()
+        self.serving = {"containers": [{"image": PREVIOUS}]}
         self.after = deepcopy(self.before)
         self.after.update(
             generation="2",
@@ -65,8 +66,9 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
         return api
 
     def test_reads_retired_revision_without_following_latest_ready(self):
-        api = self.release([self.before, {}, self.after, self.revision])
-        args = api.call_args_list[1].args
+        api = self.release([self.before, self.serving, {}, self.after, self.revision])
+        self.assertEqual(api.call_args_list[1].args[0], URL + "/revisions/" + BASELINE)
+        args = api.call_args_list[2].args
         self.assertEqual(args[0], URL + "?updateMask=template,traffic")
         self.assertEqual(args[2], "PATCH")
         self.assertEqual(args[3], {
@@ -93,12 +95,12 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
     def test_rejects_candidate_that_receives_traffic(self):
         self.after["trafficStatuses"] = [{"revision": NEW_REVISION, "percent": 100}]
         with self.assertRaisesRegex(RuntimeError, "Serving revision changed"):
-            self.release([self.before, {}, self.after])
+            self.release([self.before, self.serving, {}, self.after])
 
     def test_rejects_unconfirmed_image_import(self):
         self.revision["conditions"][1]["state"] = "CONDITION_FAILED"
         with self.assertRaisesRegex(RuntimeError, "revision condition"):
-            self.release([self.before, {}, self.after, self.revision])
+            self.release([self.before, self.serving, {}, self.after, self.revision])
 
     def test_rejects_routing_rollback(self):
         with self.assertRaisesRegex(ValueError, "only verify or zero-traffic deploy"):
@@ -110,9 +112,28 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
         api = self.release([self.before, revision], operation="verify")
         self.assertEqual([call.args[0] for call in api.call_args_list], [URL, URL + "/revisions/" + BASELINE])
 
+    def test_service_verify_checks_serving_image_after_zero_traffic_stage(self):
+        revision = {"containers": [{"image": PREVIOUS}]}
+        api = self.release([self.after, revision], operation="verify")
+        self.assertEqual([call.args[0] for call in api.call_args_list], [URL, URL + "/revisions/" + BASELINE])
+
     def test_service_verify_rejects_staged_image_when_different_image_serves(self):
         with self.assertRaisesRegex(RuntimeError, "Serving revision"):
             self.release([self.before, self.revision], operation="verify")
+
+    def test_service_deploy_rejects_wrong_serving_image_even_if_template_matches(self):
+        with self.assertRaisesRegex(RuntimeError, "Serving revision"):
+            self.release([self.before, self.revision])
+        calls = self.workflow["request"].call_args_list
+        self.assertEqual([call.args[0] for call in calls], [URL, URL + "/revisions/" + BASELINE])
+        self.assertTrue(all(len(call.args) == 2 for call in calls))
+
+    def test_service_deploy_rejects_template_drift_even_if_serving_image_matches(self):
+        with self.assertRaisesRegex(RuntimeError, "expected source image"):
+            self.release([self.after, self.serving])
+        calls = self.workflow["request"].call_args_list
+        self.assertEqual([call.args[0] for call in calls], [URL, URL + "/revisions/" + BASELINE])
+        self.assertTrue(all(len(call.args) == 2 for call in calls))
 
     def test_job_verify_requires_only_current_image_and_does_not_update(self):
         job = Mock()

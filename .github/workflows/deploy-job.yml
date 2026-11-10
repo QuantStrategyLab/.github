@@ -264,16 +264,17 @@ jobs:
               baseline = serving_revision(before)
               if any(target.get("tag") for target in before.get("traffic", [])):
                   raise RuntimeError("Expected a service without traffic tags")
+              serving = request(url + "/revisions/" + baseline, token)["containers"]
+              if len(serving) != 1 or serving[0]["image"].rsplit("@", 1)[-1] != previous.rsplit("@", 1)[-1]:
+                  raise RuntimeError("Serving revision does not have the expected image")
+              if operation == "verify":
+                  print("Verified: expected fixed image serves 100% of internal traffic")
+                  return
+
               template = service_template(before)
               containers = template["containers"]
               if len(containers) != 1 or containers[0]["image"] != previous:
                   raise RuntimeError("Service must have one container with the expected source image")
-              if operation == "verify":
-                  serving = request(url + "/revisions/" + baseline, token)["containers"]
-                  if len(serving) != 1 or serving[0]["image"].rsplit("@", 1)[-1] != previous.rsplit("@", 1)[-1]:
-                      raise RuntimeError("Serving revision does not have the expected image")
-                  print("Verified: expected fixed image serves 100% of internal traffic")
-                  return
               containers[0]["image"] = candidate
               pinned_traffic = [
                   {"type": "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", "revision": baseline, "percent": 100}
