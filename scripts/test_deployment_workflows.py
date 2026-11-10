@@ -101,9 +101,22 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
             self.release([self.before, {}, self.after, self.revision])
 
     def test_rejects_routing_rollback(self):
-        with self.assertRaisesRegex(ValueError, "only zero-traffic deploy"):
+        with self.assertRaisesRegex(ValueError, "only verify or zero-traffic deploy"):
             self.release([], operation="rollback")
         self.workflow["request"].assert_not_called()
+
+    def test_service_verify_reads_without_updating(self):
+        api = self.release([self.before], operation="verify")
+        api.assert_called_once()
+        self.assertEqual(api.call_args.args[0], URL)
+
+    def test_job_verify_requires_only_current_image_and_does_not_update(self):
+        job = Mock()
+        job.template.return_value = {"containers": [{"image": PREVIOUS}]}
+        self.workflow["check_images"](PREVIOUS, "", "verify")
+        self.workflow["release"](job, PREVIOUS, "", "verify")
+        job.read.assert_called_once()
+        job.update.assert_not_called()
 
 
 if __name__ == "__main__":

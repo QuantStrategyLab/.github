@@ -167,18 +167,21 @@ jobs:
               return template["containers"] if "containers" in template else template["template"]["containers"]
 
 
-          def check_images(previous, candidate):
+          def check_images(previous, candidate, operation):
               image_pattern = r"[a-z0-9][a-z0-9._/-]*@sha256:[a-f0-9]{64}"
-              if not all(re.fullmatch(image_pattern, image) for image in (previous, candidate)):
-                  raise ValueError("Both images must be registry paths pinned by SHA-256")
+              images = (previous,) if operation == "verify" else (previous, candidate)
+              if not all(re.fullmatch(image_pattern, image) for image in images):
+                  raise ValueError("Expected registry paths pinned by SHA-256")
+              if operation == "verify":
+                  return
               if previous == candidate or previous.split("@")[0] != candidate.split("@")[0]:
                   raise ValueError("Expected distinct digests from the same image repository")
 
 
           def release(job, previous, candidate, operation):
-              if operation not in {"deploy", "rollback"}:
-                  raise ValueError("Expected deploy or rollback")
-              expected, target = (previous, candidate) if operation == "deploy" else (candidate, previous)
+              if operation not in {"verify", "deploy", "rollback"}:
+                  raise ValueError("Expected verify, deploy or rollback")
+              expected, target = (candidate, previous) if operation == "rollback" else (previous, candidate)
               before = job.read()
               if not job.ready(before):
                   raise RuntimeError("Job is not ready for an update")
@@ -186,6 +189,9 @@ jobs:
               containers = job_containers(template)
               if len(containers) != 1 or containers[0]["image"] != expected:
                   raise RuntimeError("Job must have one container with the expected source image")
+              if operation == "verify":
+                  print("Verified: authorized read and expected fixed Job image")
+                  return
               containers[0]["image"] = target
               job.update(before, template)
               def has_target_image(row):
@@ -228,8 +234,8 @@ jobs:
 
 
           def release_service(resource, previous, candidate, operation):
-              if operation != "deploy":
-                  raise ValueError("Cloud Run Service supports only zero-traffic deploy")
+              if operation not in {"verify", "deploy"}:
+                  raise ValueError("Cloud Run Service supports only verify or zero-traffic deploy")
               if not re.fullmatch(r"projects/[\w-]+/locations/[\w-]+/services/[\w-]+", resource):
                   raise ValueError("Expected a Cloud Run Service resource name")
               url = "https://run.googleapis.com/v2/" + resource
@@ -251,6 +257,9 @@ jobs:
               containers = template["containers"]
               if len(containers) != 1 or containers[0]["image"] != previous:
                   raise RuntimeError("Service must have one container with the expected source image")
+              if operation == "verify":
+                  print("Verified: authorized read, expected fixed Service image and internal routing")
+                  return
               containers[0]["image"] = candidate
               pinned_traffic = [
                   {"type": "TRAFFIC_TARGET_ALLOCATION_TYPE_REVISION", "revision": baseline, "percent": 100}
@@ -287,7 +296,7 @@ jobs:
               resource = os.environ["RESOURCE"]
               previous, candidate = os.environ["PREVIOUS"], os.environ["CANDIDATE"]
               operation = os.environ["OPERATION"]
-              check_images(previous, candidate)
+              check_images(previous, candidate, operation)
               if provider == "gcp-service":
                   release_service(resource, previous, candidate, operation)
               else:
