@@ -55,3 +55,23 @@ Scope the release identity to the target service and its revisions with
 permission to act as its runtime identity and to read the specified image
 repository where required. If a run reports an uncertain result, inspect the
 service and candidate revision before dispatching another release.
+
+## Azure Blob packages
+
+Call `.github/workflows/deploy-azure-blob.yml` at an immutable commit from a
+manual workflow. Use a protected Environment with its own OIDC identity.
+Scope it to read and write blobs in the package container and keep the runtime
+identity separate. The workflow does not require a Storage account key.
+
+Set `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_STORAGE_ACCOUNT`,
+`DEPLOY_CONTAINER`, `DEPLOY_BLOB`, and `DEPLOY_PREVIOUS_SHA256`.
+Use `verify` to check the active package. To deploy, stage the approved ZIP
+at `releases/<sha256>.zip` in the same private container, set
+`DEPLOY_CANDIDATE_SHA256`, then dispatch `deploy`.
+
+The workflow validates both digests, creates a backup at
+`rollback/<previous-sha256>.zip`, and updates the live object only if its
+original ETag still matches. It reads back the package using the returned
+ETag. Dispatch `rollback` with the same digest pair to restore the backup
+only when the expected candidate is live. A failed conditional write
+requires readback before another operation.

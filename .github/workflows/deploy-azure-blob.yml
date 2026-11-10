@@ -1,0 +1,180 @@
+name: Release a fixed Azure Blob package
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      operation:
+        required: true
+        type: string
+permissions: {}
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: release-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      id-token: write
+    steps:
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        env:
+          AZURE_CORE_OUTPUT: none
+        with:
+          client-id: ${{ vars.DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ vars.DEPLOY_TENANT_ID }}
+          allow-no-subscriptions: true
+      - name: Verify or conditionally replace the fixed package
+        env:
+          OPERATION: ${{ inputs.operation }}
+          ACCOUNT: ${{ vars.DEPLOY_STORAGE_ACCOUNT }}
+          CONTAINER: ${{ vars.DEPLOY_CONTAINER }}
+          BLOB: ${{ vars.DEPLOY_BLOB }}
+          PREVIOUS: ${{ vars.DEPLOY_PREVIOUS_SHA256 }}
+          CANDIDATE: ${{ vars.DEPLOY_CANDIDATE_SHA256 }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import base64
+          import hashlib
+          import os
+          import re
+          import subprocess
+          from email.utils import formatdate
+          from io import BytesIO
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import HTTPRedirectHandler, Request, build_opener
+          from zipfile import is_zipfile
+
+          LIMIT = 60_000_000
+          CONTENT_FIELDS = {
+              "content-type", "content-encoding", "content-language",
+              "content-disposition", "cache-control",
+          }
+
+
+          class Conflict(Exception):
+              pass
+
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+
+          def digest(payload):
+              return hashlib.sha256(payload).hexdigest()
+
+
+          class BlobStore:
+              def __init__(self, account, container, token):
+                  if not re.fullmatch(r"[a-z0-9]{3,24}", account):
+                      raise ValueError("Expected an Azure Storage account name")
+                  if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,61}[a-z0-9]", container):
+                      raise ValueError("Expected a Blob container name")
+                  self.root = f"https://{account}.blob.core.windows.net/{container}/"
+                  self.token = token
+                  self.opener = build_opener(NoRedirect())
+
+              def request(self, method, key, *, payload=None, headers=None):
+                  request_headers = {
+                      "Authorization": "Bearer " + self.token,
+                      "x-ms-version": "2023-11-03",
+                      "x-ms-date": formatdate(usegmt=True),
+                      **(headers or {}),
+                  }
+                  try:
+                      url = self.root + quote(key, safe="/")
+                      with self.opener.open(Request(url, payload, request_headers, method=method), timeout=60) as reply:
+                          body = reply.read(LIMIT + 1)
+                          if len(body) > LIMIT:
+                              raise RuntimeError("Blob package exceeds the release size limit")
+                          return body, {name.lower(): value for name, value in reply.headers.items()}
+                  except HTTPError as error:
+                      if method == "PUT" and error.code in (409, 412):
+                          raise Conflict() from None
+                      raise RuntimeError(f"Blob {method} returned HTTP {error.code}") from None
+
+              def get(self, key, etag=None):
+                  return self.request("GET", key, headers={"If-Match": etag} if etag else None)
+
+              def put(self, key, payload, previous_headers, condition):
+                  headers = {
+                      "x-ms-blob-type": "BlockBlob",
+                      "Content-MD5": base64.b64encode(
+                          hashlib.md5(payload, usedforsecurity=False).digest()
+                      ).decode(),
+                      **condition,
+                  }
+                  for name, value in previous_headers.items():
+                      if name in CONTENT_FIELDS:
+                          headers["x-ms-blob-" + name] = value
+                      if name.startswith("x-ms-meta-") or name == "x-ms-access-tier":
+                          headers[name] = value
+                  return self.request("PUT", key, payload=payload, headers=headers)[1]["etag"]
+
+
+          def release(store, key, previous, candidate, operation):
+              if operation not in {"verify", "deploy", "rollback"}:
+                  raise ValueError("Expected verify, deploy or rollback")
+              if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,119}\.zip", key):
+                  raise ValueError("Expected a ZIP package name at the container root")
+              if not re.fullmatch(r"[0-9a-f]{64}", previous):
+                  raise ValueError("Expected a fixed current SHA-256")
+              if operation != "verify" and (
+                  not re.fullmatch(r"[0-9a-f]{64}", candidate) or candidate == previous
+              ):
+                  raise ValueError("Expected a distinct fixed candidate SHA-256")
+              live, headers = store.get(key)
+              expected = candidate if operation == "rollback" else previous
+              if digest(live) != expected:
+                  raise RuntimeError("Live package does not match the expected SHA-256")
+              if operation == "verify":
+                  print("Verified: authorized read and expected live package SHA-256")
+                  return
+              if headers.get("x-ms-blob-type") != "BlockBlob" or int(headers.get("x-ms-tag-count", "0")):
+                  raise RuntimeError("Expected an untagged block blob")
+              backup = f"rollback/{previous}.zip"
+              source = f"releases/{candidate}.zip" if operation == "deploy" else backup
+              target, _ = store.get(source)
+              target_hash = candidate if operation == "deploy" else previous
+              if digest(target) != target_hash or not is_zipfile(BytesIO(target)):
+                  raise RuntimeError("Release artifact does not match its fixed ZIP digest")
+              if operation == "deploy":
+                  try:
+                      store.put(backup, live, headers, {"If-None-Match": "*"})
+                  except Conflict:
+                      pass
+                  saved, _ = store.get(backup)
+                  if saved != live:
+                      raise RuntimeError("Rollback backup does not match the live package")
+              try:
+                  new_etag = store.put(key, target, headers, {"If-Match": headers["etag"]})
+              except Conflict:
+                  raise RuntimeError("Live Blob write was rejected. Read the target before retrying.") from None
+              observed, _ = store.get(key, new_etag)
+              if observed != target:
+                  raise RuntimeError("Live Blob readback differs from the intended package")
+              print(f"{operation} verified: live SHA-256 read back at the returned ETag")
+
+
+          def main():
+              token = subprocess.run(
+                  ["az", "account", "get-access-token", "--resource", "https://storage.azure.com/",
+                   "--query", "accessToken", "-o", "tsv"],
+                  capture_output=True, text=True, check=True,
+              ).stdout.strip()
+              store = BlobStore(os.environ["ACCOUNT"], os.environ["CONTAINER"], token)
+              release(store, os.environ["BLOB"], os.environ["PREVIOUS"],
+                      os.environ["CANDIDATE"], os.environ["OPERATION"])
+
+
+          if __name__ == "__main__":
+              main()
+          PY
