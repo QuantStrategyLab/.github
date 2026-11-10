@@ -67,6 +67,8 @@ Set these masked configuration values as Environment secrets so public logs
 keep storage identifiers and package digests private. They do not authenticate
 requests. Configure `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_STORAGE_ACCOUNT`,
 `DEPLOY_CONTAINER`, `DEPLOY_BLOB`, and `DEPLOY_PREVIOUS_SHA256`.
+Pass these names and the optional candidate digest explicitly in the caller's
+`secrets` map. The protected Environment supplies the values at runtime.
 Use `verify` to check the active package. To deploy, stage the approved ZIP
 at `releases/<sha256>.zip` in the same private container, set
 `DEPLOY_CANDIDATE_SHA256`, then dispatch `deploy`.
