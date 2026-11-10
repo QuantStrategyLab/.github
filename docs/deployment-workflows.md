@@ -85,3 +85,14 @@ original ETag still matches. It reads back the package using the returned
 ETag. Dispatch `rollback` with the same digest pair to restore the backup
 only when the expected candidate is live. A failed conditional write
 requires readback before another operation.
+
+## Check CI before artifact publication
+
+Call `QuantStrategyLab/.github/actions/verify-main-ci` at an immutable commit
+before a publish step. Grant the job `actions: read` and provide its GitHub
+token as `GH_TOKEN`. The action requires the latest run of `ci.yml` on
+`main` to have completed successfully. Set `CI_WORKFLOW` or `VERIFY_BRANCH`
+when the repository uses a different CI workflow or branch.
+
+The caller selects when to run the check and owns the market-specific
+validation, storage credentials and write plan.

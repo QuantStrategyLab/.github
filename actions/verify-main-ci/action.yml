@@ -1,0 +1,10 @@
+name: Verify main CI before publication
+description: Require the latest configured branch CI run to have succeeded
+runs:
+  using: composite
+  steps:
+    - name: Check latest CI run
+      shell: bash
+      env:
+        ACTION_ROOT: ${{ github.action_path }}
+      run: bash "$ACTION_ROOT/verify.sh"
