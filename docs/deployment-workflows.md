@@ -18,6 +18,12 @@ Set the following variables in that environment. Use one environment per target.
 | `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_SUBSCRIPTION_ID` | Azure federation identifiers |
 | `DEPLOY_WIF_PROVIDER`, `DEPLOY_SERVICE_ACCOUNT` | Google federation identifiers |
 
+To keep resource identifiers and image digests out of public run logs, store
+the resource, images, and Google federation identifiers as protected Environment
+secrets. Pass the corresponding names explicitly in the caller's `secrets`
+map. Do not set same-named variables for a target that uses masked values.
+Existing variable-based callers remain supported.
+
 Use the `verify` operation to check OIDC and the expected current image
 without changing the resource. Set `DEPLOY_PREVIOUS_IMAGE` to the expected
 current image. On a Service, both the configured template and the serving
