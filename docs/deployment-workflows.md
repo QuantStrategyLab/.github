@@ -18,6 +18,13 @@ Set the following variables in that environment. Use one environment per target.
 | `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_SUBSCRIPTION_ID` | Azure federation identifiers |
 | `DEPLOY_WIF_PROVIDER`, `DEPLOY_SERVICE_ACCOUNT` | Google federation identifiers |
 
+Use the `verify` operation to check OIDC and the expected current image
+without changing the resource. Set `DEPLOY_PREVIOUS_IMAGE` to the expected
+current image. On a Service, both the configured template and the serving
+revision must match. A candidate image is required only for deploy or rollback.
+Verify checks access to read the target. Test image updates on a separate
+isolated environment before enabling production releases.
+
 ## Jobs
 
 Select `azure` or `gcp` as the provider, and `deploy` or `rollback` as the
@@ -31,7 +38,7 @@ from the GitHub release identity.
 
 ## Cloud Run Services
 
-Select `gcp-service` as the provider and `deploy` as the operation. Use a resource
+Select `gcp-service` as the provider and `verify` or `deploy` as the operation. Use a resource
 name of the form `projects/<project>/locations/<region>/services/<service>`. The
 service must have internal ingress, invoker IAM enabled, one container with the
 expected image, and one revision serving 100% of traffic without tags.
