@@ -8,6 +8,21 @@ on:
       operation:
         required: true
         type: string
+    secrets:
+      DEPLOY_CLIENT_ID:
+        required: true
+      DEPLOY_TENANT_ID:
+        required: true
+      DEPLOY_STORAGE_ACCOUNT:
+        required: true
+      DEPLOY_CONTAINER:
+        required: true
+      DEPLOY_BLOB:
+        required: true
+      DEPLOY_PREVIOUS_SHA256:
+        required: true
+      DEPLOY_CANDIDATE_SHA256:
+        required: false
 permissions: {}
 jobs:
   release:
