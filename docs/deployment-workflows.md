@@ -63,7 +63,9 @@ manual workflow. Use a protected Environment with its own OIDC identity.
 Scope it to read and write blobs in the package container and keep the runtime
 identity separate. The workflow does not require a Storage account key.
 
-Set `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_STORAGE_ACCOUNT`,
+Set these masked configuration values as Environment secrets so public logs
+keep storage identifiers and package digests private. They do not authenticate
+requests. Configure `DEPLOY_CLIENT_ID`, `DEPLOY_TENANT_ID`, `DEPLOY_STORAGE_ACCOUNT`,
 `DEPLOY_CONTAINER`, `DEPLOY_BLOB`, and `DEPLOY_PREVIOUS_SHA256`.
 Use `verify` to check the active package. To deploy, stage the approved ZIP
 at `releases/<sha256>.zip` in the same private container, set

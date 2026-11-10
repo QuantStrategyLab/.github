@@ -26,17 +26,17 @@ jobs:
         env:
           AZURE_CORE_OUTPUT: none
         with:
-          client-id: ${{ vars.DEPLOY_CLIENT_ID }}
-          tenant-id: ${{ vars.DEPLOY_TENANT_ID }}
+          client-id: ${{ secrets.DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.DEPLOY_TENANT_ID }}
           allow-no-subscriptions: true
       - name: Verify or conditionally replace the fixed package
         env:
           OPERATION: ${{ inputs.operation }}
-          ACCOUNT: ${{ vars.DEPLOY_STORAGE_ACCOUNT }}
-          CONTAINER: ${{ vars.DEPLOY_CONTAINER }}
-          BLOB: ${{ vars.DEPLOY_BLOB }}
-          PREVIOUS: ${{ vars.DEPLOY_PREVIOUS_SHA256 }}
-          CANDIDATE: ${{ vars.DEPLOY_CANDIDATE_SHA256 }}
+          ACCOUNT: ${{ secrets.DEPLOY_STORAGE_ACCOUNT }}
+          CONTAINER: ${{ secrets.DEPLOY_CONTAINER }}
+          BLOB: ${{ secrets.DEPLOY_BLOB }}
+          PREVIOUS: ${{ secrets.DEPLOY_PREVIOUS_SHA256 }}
+          CANDIDATE: ${{ secrets.DEPLOY_CANDIDATE_SHA256 }}
         shell: bash
         run: |
           python3 -u - <<'PY'
