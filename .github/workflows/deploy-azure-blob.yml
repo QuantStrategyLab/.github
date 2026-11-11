@@ -8,6 +8,11 @@ on:
       operation:
         required: true
         type: string
+      source-artifact:
+        description: Same-run artifact containing the two reviewed digest scripts
+        required: false
+        default: ''
+        type: string
     secrets:
       DEPLOY_CLIENT_ID:
         required: true
@@ -35,7 +40,14 @@ jobs:
       cancel-in-progress: false
     permissions:
       id-token: write
+      actions: read
     steps:
+      - name: Download the reviewed digest source overlay
+        if: inputs.source-artifact != '' && inputs.operation != 'rollback'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: ${{ inputs.source-artifact }}
+          path: ${{ runner.temp }}/digest-source
       - name: Sign in to Azure with OIDC
         uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
         env:
@@ -52,25 +64,32 @@ jobs:
           BLOB: ${{ secrets.DEPLOY_BLOB }}
           PREVIOUS: ${{ secrets.DEPLOY_PREVIOUS_SHA256 }}
           CANDIDATE: ${{ secrets.DEPLOY_CANDIDATE_SHA256 }}
+          SOURCE_OVERLAY: ${{ inputs.source-artifact != '' && inputs.operation != 'rollback' && format('{0}/digest-source', runner.temp) || '' }}
         shell: bash
         run: |
           python3 -u - <<'PY'
           import base64
+          import copy
           import hashlib
           import os
           import re
           import subprocess
           from email.utils import formatdate
           from io import BytesIO
+          from pathlib import Path
           from urllib.error import HTTPError
           from urllib.parse import quote
           from urllib.request import HTTPRedirectHandler, Request, build_opener
-          from zipfile import is_zipfile
+          from zipfile import ZIP_STORED, ZipFile, is_zipfile
 
           LIMIT = 60_000_000
           CONTENT_FIELDS = {
               "content-type", "content-encoding", "content-language",
               "content-disposition", "cache-control",
+          }
+          DIGEST_SCRIPTS = {
+              "python/scripts/account_daily_digest.py",
+              "python/scripts/cloud_run_daily_digest.py",
           }
 
 
@@ -85,6 +104,32 @@ jobs:
 
           def digest(payload):
               return hashlib.sha256(payload).hexdigest()
+
+
+          def overlay_package(payload, directory):
+              root = Path(directory)
+              files = {str(path.relative_to(root)): path.read_bytes()
+                       for path in root.rglob("*") if path.is_file()}
+              if files.keys() != DIGEST_SCRIPTS:
+                  raise ValueError("Expected exactly the two reviewed digest scripts")
+              output = BytesIO()
+              with ZipFile(BytesIO(payload)) as source, ZipFile(output, "w") as target:
+                  names = source.namelist()
+                  if len(names) != len(set(names)) or not DIGEST_SCRIPTS <= set(names):
+                      raise ValueError("Expected unique existing digest script paths")
+                  if all(source.read(name) == body for name, body in files.items()):
+                      raise ValueError("Source overlay has no changes")
+                  target.comment = source.comment
+                  for entry in source.infolist():
+                      body = files[entry.filename] if entry.filename in files else source.read(entry)
+                      metadata = copy.copy(entry)
+                      # Stable bytes across runner platforms and Python/zlib versions.
+                      metadata.compress_type = ZIP_STORED
+                      target.writestr(metadata, body)
+              result = output.getvalue()
+              if len(result) > LIMIT:
+                  raise ValueError("Overlay package exceeds the release size limit")
+              return result
 
 
           class BlobStore:
@@ -135,14 +180,14 @@ jobs:
                   return self.request("PUT", key, payload=payload, headers=headers)[1]["etag"]
 
 
-          def release(store, key, previous, candidate, operation):
+          def release(store, key, previous, candidate, operation, overlay=None):
               if operation not in {"verify", "deploy", "rollback"}:
                   raise ValueError("Expected verify, deploy or rollback")
               if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,119}\.zip", key):
                   raise ValueError("Expected a ZIP package name at the container root")
               if not re.fullmatch(r"[0-9a-f]{64}", previous):
                   raise ValueError("Expected a fixed current SHA-256")
-              if operation != "verify" and (
+              if (operation != "verify" or overlay) and (
                   not re.fullmatch(r"[0-9a-f]{64}", candidate) or candidate == previous
               ):
                   raise ValueError("Expected a distinct fixed candidate SHA-256")
@@ -150,14 +195,28 @@ jobs:
               expected = candidate if operation == "rollback" else previous
               if digest(live) != expected:
                   raise RuntimeError("Live package does not match the expected SHA-256")
+              target = None
+              if overlay and operation != "rollback":
+                  target = overlay_package(live, overlay)
+                  if digest(target) != candidate:
+                      raise RuntimeError("Source overlay does not match the fixed candidate SHA-256")
               if operation == "verify":
-                  print("Verified: authorized read and expected live package SHA-256")
+                  print("Verified: expected live package and, when supplied, source overlay SHA-256")
                   return
               if headers.get("x-ms-blob-type") != "BlockBlob" or int(headers.get("x-ms-tag-count", "0")):
                   raise RuntimeError("Expected an untagged block blob")
               backup = f"rollback/{previous}.zip"
               source = f"releases/{candidate}.zip" if operation == "deploy" else backup
-              target, _ = store.get(source)
+              if target is not None:
+                  try:
+                      store.put(source, target, headers, {"If-None-Match": "*"})
+                  except Conflict:
+                      pass
+                  staged, _ = store.get(source)
+                  if staged != target:
+                      raise RuntimeError("Staged artifact differs from the reviewed source overlay")
+              else:
+                  target, _ = store.get(source)
               target_hash = candidate if operation == "deploy" else previous
               if digest(target) != target_hash or not is_zipfile(BytesIO(target)):
                   raise RuntimeError("Release artifact does not match its fixed ZIP digest")
@@ -187,7 +246,8 @@ jobs:
               ).stdout.strip()
               store = BlobStore(os.environ["ACCOUNT"], os.environ["CONTAINER"], token)
               release(store, os.environ["BLOB"], os.environ["PREVIOUS"],
-                      os.environ["CANDIDATE"], os.environ["OPERATION"])
+                      os.environ["CANDIDATE"], os.environ["OPERATION"],
+                      overlay=os.environ.get("SOURCE_OVERLAY") or None)
 
 
           if __name__ == "__main__":

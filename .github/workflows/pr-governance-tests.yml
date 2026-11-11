@@ -28,6 +28,10 @@ jobs:
           pr-governance/scripts/test-nudge.cjs
       - name: Install the pinned scanner
         run: bash pr-governance/scripts/install-gitleaks.sh
+      - name: Test the shared release contracts
+        run: |
+          python3 scripts/test_blob_release.py
+          python3 scripts/test_deployment_workflows.py
       - name: Test the scanner
         env:
           GITLEAKS_BIN: ${{ runner.temp }}/gitleaks-bin/gitleaks

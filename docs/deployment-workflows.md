@@ -88,6 +88,20 @@ ETag. Dispatch `rollback` with the same digest pair to restore the backup
 only when the expected candidate is live. A failed conditional write
 requires readback before another operation.
 
+The digest caller may pass `source-artifact`, a same-run artifact containing
+exactly `python/scripts/account_daily_digest.py` and
+`python/scripts/cloud_run_daily_digest.py` from its reviewed main commit.
+Grant that caller `actions: read`. The shared workflow replaces only those
+existing ZIP members and retains the other package contents and entry metadata.
+It uses uncompressed ZIP entries so the protected candidate digest is stable
+across runner platforms. Set both fixed digests before dispatching a release.
+With this artifact, `verify` rebuilds and checks the candidate without writes;
+`deploy` stages it with create-only semantics, reads it back, then uses the
+same backup and ETag checks. `rollback` uses the saved package without an overlay.
+The caller must check main CI before uploading the source artifact. Updating
+the reusable workflow pin also requires updating the existing federated trust
+to that reviewed immutable commit; it does not require broader storage access.
+
 ## Check CI before artifact publication
 
 Call `QuantStrategyLab/.github/actions/verify-main-ci` at an immutable commit
