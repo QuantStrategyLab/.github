@@ -151,7 +151,7 @@ non-fast-forward pushes, plus an audit over the tracked tree.
 
 ## Twin repositories
 
-`pr-governance/` is byte-identical in `Pigbibi/governance`, `GdeiAssistant/.github`
+`pr-governance/` is byte-identical in `Pigbibi/PrGovernance`, `GdeiAssistant/.github`
 and `QuantStrategyLab/.github`; `VERSION` names the shared revision. Each
 repository runs `scripts/check-twin-drift.sh` weekly and on demand. A change to
 any shared file is applied to all three before the drift check can pass.
