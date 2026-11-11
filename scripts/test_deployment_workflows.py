@@ -117,6 +117,31 @@ class CloudRunServiceReleaseTest(unittest.TestCase):
         api = self.release([self.after, revision], operation="verify")
         self.assertEqual([call.args[0] for call in api.call_args_list], [URL, URL + "/revisions/" + BASELINE])
 
+    def test_service_verify_reads_serving_image_with_zero_traffic_tags(self):
+        for percent in ({}, {"percent": 0}):
+            with self.subTest(percent=percent):
+                before = deepcopy(self.before)
+                tag = {"revision": NEW_REVISION, "tag": "candidate", **percent}
+                before["traffic"].append(tag)
+                before["trafficStatuses"].append(tag)
+                api = self.release([before, self.serving], operation="verify")
+                self.assertEqual([call.args for call in api.call_args_list], [
+                    (URL, "synthetic-test-token"),
+                    (URL + "/revisions/" + BASELINE, "synthetic-test-token"),
+                ])
+                with self.assertRaisesRegex(RuntimeError, "one serving revision at 100%"):
+                    self.release([before])
+                self.workflow["request"].assert_called_once()
+
+    def test_service_verify_rejects_split_traffic_even_if_second_revision_is_tagged(self):
+        self.before["trafficStatuses"] = [
+            {"revision": BASELINE, "percent": 50},
+            {"revision": NEW_REVISION, "percent": 50, "tag": "candidate"},
+        ]
+        with self.assertRaisesRegex(RuntimeError, "one serving revision at 100%"):
+            self.release([self.before], operation="verify")
+        self.workflow["request"].assert_called_once()
+
     def test_service_verify_rejects_staged_image_when_different_image_serves(self):
         with self.assertRaisesRegex(RuntimeError, "Serving revision"):
             self.release([self.before, self.revision], operation="verify")

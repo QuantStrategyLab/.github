@@ -12,6 +12,12 @@ on:
         required: true
         type: string
     secrets:
+      DEPLOY_CLIENT_ID:
+        required: false
+      DEPLOY_TENANT_ID:
+        required: false
+      DEPLOY_SUBSCRIPTION_ID:
+        required: false
       DEPLOY_WIF_PROVIDER:
         required: false
       DEPLOY_SERVICE_ACCOUNT:
@@ -41,9 +47,9 @@ jobs:
         env:
           AZURE_CORE_OUTPUT: none
         with:
-          client-id: ${{ vars.DEPLOY_CLIENT_ID }}
-          tenant-id: ${{ vars.DEPLOY_TENANT_ID }}
-          subscription-id: ${{ vars.DEPLOY_SUBSCRIPTION_ID }}
+          client-id: ${{ secrets.DEPLOY_CLIENT_ID || vars.DEPLOY_CLIENT_ID }}
+          tenant-id: ${{ secrets.DEPLOY_TENANT_ID || vars.DEPLOY_TENANT_ID }}
+          subscription-id: ${{ secrets.DEPLOY_SUBSCRIPTION_ID || vars.DEPLOY_SUBSCRIPTION_ID }}
       - name: Exchange GitHub OIDC for a Google access token
         if: inputs.provider == 'gcp' || inputs.provider == 'gcp-service'
         id: gcp
@@ -222,9 +228,15 @@ jobs:
               )
 
 
-          def serving_revision(service):
+          def serving_revision(service, *, verify_only=False):
               targets = service["trafficStatuses"]
-              if len(targets) != 1 or targets[0].get("percent") != 100 or targets[0].get("tag"):
+              if verify_only:
+                  # Cloud Run may omit the default 0% on tagged revision URLs.
+                  targets = [target for target in targets
+                             if not (target.get("tag") and target.get("percent", 0) == 0)]
+              if len(targets) != 1 or targets[0].get("percent") != 100:
+                  raise RuntimeError("Expected one serving revision at 100%")
+              if not verify_only and targets[0].get("tag"):
                   raise RuntimeError("Expected one untagged serving revision at 100%")
               return targets[0]["revision"].rsplit("/", 1)[-1]
 
@@ -261,8 +273,8 @@ jobs:
               exposure = service_exposure(before)
               if exposure[:2] != ("INGRESS_TRAFFIC_INTERNAL_ONLY", False):
                   raise RuntimeError("Expected internal ingress with invoker IAM enabled")
-              baseline = serving_revision(before)
-              if any(target.get("tag") for target in before.get("traffic", [])):
+              baseline = serving_revision(before, verify_only=operation == "verify")
+              if operation == "deploy" and any(target.get("tag") for target in before.get("traffic", [])):
                   raise RuntimeError("Expected a service without traffic tags")
               serving = request(url + "/revisions/" + baseline, token)["containers"]
               if len(serving) != 1 or serving[0]["image"].rsplit("@", 1)[-1] != previous.rsplit("@", 1)[-1]:
