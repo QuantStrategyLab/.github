@@ -113,11 +113,11 @@ class BlobReleaseTests(unittest.TestCase):
         root = self.source_overlay()
         extra = root / "extra.py"
         extra.write_text("# not part of this release")
-        with self.assertRaisesRegex(ValueError, "exactly the two"):
+        with self.assertRaisesRegex(ValueError, "exactly the three"):
             self.module["overlay_package"](self.old, root)
         extra.unlink()
         (root / next(iter(self.module["DIGEST_SCRIPTS"]))).unlink()
-        with self.assertRaisesRegex(ValueError, "exactly the two"):
+        with self.assertRaisesRegex(ValueError, "exactly the three"):
             self.module["overlay_package"](self.old, root)
 
     def test_overlay_cannot_add_new_package_paths(self):
