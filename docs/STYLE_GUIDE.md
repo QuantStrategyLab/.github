@@ -104,6 +104,7 @@ Notes on the outline:
 - Configuration is a table. Mark each variable required or optional, give a default, and use placeholders such as `<bucket>`, `<project-id>`, `<your-subdomain>`, `$PROJECTS_ROOT`. Never a real value.
 - Architecture links out instead of repeating detail in the README.
 - Avoid dated status banners in a README. Status is a present-tense fact; dated history belongs in `CHANGELOG.md`, release notes or a retained evidence record.
+- Update `README.md` or `README.zh-CN.md` only when user-visible installation, configuration, CLI behavior, or public API contracts change. Internal refactoring, test hardening, or governance adjustments belong in tests and pull request descriptions, never as `this PR` / `remains unchanged` notes or sections placed after `## License` (`## 许可证`).
 
 ## 4. Language
 
@@ -179,10 +180,18 @@ If the content is useful internally, move it to a private location. Removing it 
 Disposable internal notes do not belong in a public repository. Keep them in the private ops repository, in approved protected storage, or in a local folder outside any repository. If a note has to live in the working tree, put it in an ignored path and never commit it.
 
 ```gitignore
+.claude/
+.codex/
 .local/
 ops-notes/
 *.local.md
 *.internal.md
+docs/audits/
+docs/plans/
+docs/handoffs/
+docs/superpowers/
+docs/changes/
+docs/acceptance-policy.md
 ```
 
 Reader-facing docs describe behavior, not the history of internal work. History goes to `CHANGELOG.md`, release notes and pull requests. Dated reports, raw evidence tables and approval reasoning go to the private ops repository. Sanitized evidence and decisions that a project requirement says to retain may be versioned; see section 5. Worktree and absolute local paths never appear in committed files.
@@ -532,7 +541,7 @@ Apply the guide one repository at a time, as a single documentation-only PR. Mov
 
 The guide is enforced in four light ways.
 
-- The org-wide `PULL_REQUEST_TEMPLATE.md` in this repository applies to every repository without a template of its own. It carries the style-guide checkbox; a checked box is the author's statement, not proof.
+- The org-wide `.github/PULL_REQUEST_TEMPLATE.md` in this repository applies to every repository without a template of its own. Repository PRs follow that template and fill in every required section.
 - Each repository's `CONTRIBUTING.md` links to this guide in one line:
 
   ```markdown
