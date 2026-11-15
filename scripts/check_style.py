@@ -296,7 +296,57 @@ class Report:
         return [f for f in self.findings if f[0] not in self.blocking]
 
 
+def git_visible_files(root: Path) -> set[Path] | None:
+    """Return tracked and unignored working-tree files when root is a Git checkout."""
+    if not (root / ".git").exists():
+        return None
+    res = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    if res.returncode != 0:
+        return None
+    visible: set[Path] = set()
+    for raw in res.stdout.split(b"\0"):
+        if not raw:
+            continue
+        rel = raw.decode("utf-8", errors="surrogateescape")
+        candidate = root / rel
+        if candidate.is_file():
+            visible.add(candidate)
+    return visible
+
+
+def is_untracked_gitignored(root: Path, rel_path: str) -> bool:
+    """Return True only when rel_path has no tracked/unignored files and is gitignored."""
+    if not (root / ".git").exists():
+        return False
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", rel_path],
+        cwd=root,
+        capture_output=True,
+        check=False,
+    )
+    if listed.returncode == 0 and listed.stdout.strip(b"\0"):
+        return False
+    ignored = subprocess.run(
+        ["git", "check-ignore", "-q", "--", rel_path],
+        cwd=root,
+        check=False,
+    )
+    return ignored.returncode == 0
+
+
 def iter_files(root: Path):
+    visible = git_visible_files(root)
+    if visible is not None:
+        for path in sorted(visible):
+            if any(part in SKIP_DIRS for part in path.parts):
+                continue
+            yield path
+        return
     for path in sorted(root.rglob("*")):
         if any(part in SKIP_DIRS for part in path.parts):
             continue
@@ -483,7 +533,9 @@ def check_agent_files(root: Path, report: Report) -> None:
         if content != "@AGENTS.md":
             report.add("agents", "CLAUDE.md must contain the single line @AGENTS.md")
 
-    if (root / ".github" / "engineering.md").exists():
+    if (root / ".github" / "engineering.md").exists() and not is_untracked_gitignored(
+        root, ".github/engineering.md"
+    ):
         report.add(
             "agents",
             ".github/engineering.md is retired; consolidate rules in AGENTS.md",
@@ -655,7 +707,9 @@ def check_internal_paths(root: Path, report: Report) -> None:
             "hygiene",
             ".gitignore: remove obsolete !.github/engineering.md unignore rule",
         )
-    if (root / "docs" / "acceptance-policy.md").exists():
+    if (root / "docs" / "acceptance-policy.md").exists() and not is_untracked_gitignored(
+        root, "docs/acceptance-policy.md"
+    ):
         report.add(
             "publish",
             "docs/acceptance-policy.md: internal acceptance policy stays out of public repositories (section 5)",
