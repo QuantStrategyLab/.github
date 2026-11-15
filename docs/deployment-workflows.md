@@ -112,3 +112,28 @@ when the repository uses a different CI workflow or branch.
 
 The caller selects when to run the check and owns the market-specific
 validation, storage credentials and write plan.
+
+## Cloudflare Workers
+
+Call `.github/workflows/deploy-cloudflare-worker.yml` at an immutable commit from a
+manual workflow (`workflow_dispatch` on `refs/heads/main`). Use a protected GitHub
+Environment whose scoped Cloudflare API token only permits Worker Scripts and
+Deployments on the target account (`<account-id>`).
+
+Store target identifiers and pinned version UUIDs as protected Environment secrets
+and pass them explicitly in the caller's `secrets` map so public workflow logs do
+not disclose account or script names (`example-worker`):
+
+| Secret | Purpose |
+| --- | --- |
+| `CF_API_TOKEN` | Scoped Cloudflare Workers edit token |
+| `CF_ACCOUNT_ID` | 32-character hex Cloudflare account identifier |
+| `CF_WORKER_SCRIPT_NAME` | Target Worker script name |
+| `CF_EXPECTED_VERSION_ID` | Expected baseline Worker version UUID |
+| `CF_CANDIDATE_VERSION_ID` | Candidate Worker version UUID (`deploy` and `rollback`) |
+
+Use `verify` to check that a single version serves 100% traffic and matches
+`CF_EXPECTED_VERSION_ID` with no writes. Use `deploy` to confirm the baseline,
+verify that `CF_CANDIDATE_VERSION_ID` exists, promote it to 100% traffic, and read
+back `/deployments`. Use `rollback` with the same pair of UUIDs to restore
+`CF_EXPECTED_VERSION_ID` when the candidate is live.
