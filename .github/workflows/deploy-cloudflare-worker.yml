@@ -1,0 +1,181 @@
+name: Release a pinned Cloudflare Worker version
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+      operation:
+        required: true
+        type: string
+    secrets:
+      CF_API_TOKEN:
+        required: true
+      CF_ACCOUNT_ID:
+        required: true
+      CF_WORKER_SCRIPT_NAME:
+        required: true
+      CF_EXPECTED_VERSION_ID:
+        required: true
+      CF_CANDIDATE_VERSION_ID:
+        required: false
+permissions: {}
+jobs:
+  release:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    environment: ${{ inputs.environment }}
+    concurrency:
+      group: worker-release-${{ inputs.environment }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+    steps:
+      - name: Verify or promote a pinned Worker version
+        env:
+          OPERATION: ${{ inputs.operation }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_WORKER_SCRIPT_NAME: ${{ secrets.CF_WORKER_SCRIPT_NAME }}
+          CF_EXPECTED_VERSION_ID: ${{ secrets.CF_EXPECTED_VERSION_ID }}
+          CF_CANDIDATE_VERSION_ID: ${{ secrets.CF_CANDIDATE_VERSION_ID }}
+        shell: bash
+        run: |
+          python3 -u - <<'PY'
+          import json
+          import os
+          import re
+          from urllib.error import HTTPError
+          from urllib.request import HTTPRedirectHandler, Request, build_opener
+
+          ACCOUNT_RE = re.compile(r"[0-9a-f]{32}")
+          SCRIPT_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,62}")
+          UUID_RE = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+          class NoRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+
+          class WorkerDeployer:
+              def __init__(self, account_id, script_name, credential):
+                  if not ACCOUNT_RE.fullmatch(account_id or ""):
+                      raise ValueError("Expected a 32-character hex Cloudflare account ID")
+                  if not SCRIPT_RE.fullmatch(script_name or ""):
+                      raise ValueError("Expected a valid Worker script name")
+                  if not (credential or "").strip():
+                      raise ValueError("CF_API_TOKEN is required")
+                  self.base_url = (
+                      f"https://api.cloudflare.com/client/v4/accounts/{account_id}"
+                      f"/workers/scripts/{script_name}"
+                  )
+                  self.auth_header = "Bearer " + credential.strip()
+                  self.opener = build_opener(NoRedirect())
+
+              def request(self, method, suffix, body=None):
+                  payload = None if body is None else json.dumps(body).encode("utf-8")
+                  headers = {
+                      "Authorization": self.auth_header,
+                      "Content-Type": "application/json",
+                  }
+                  try:
+                      req = Request(self.base_url + suffix, payload, headers, method=method)
+                      with self.opener.open(req, timeout=30) as response:
+                          parsed = json.loads((response.read() or b"{}").decode("utf-8"))
+                  except HTTPError as error:
+                      raise RuntimeError(f"Cloudflare API {method} returned HTTP {error.code}") from None
+                  if not isinstance(parsed, dict) or parsed.get("success") is False:
+                      raise RuntimeError(f"Cloudflare API {method} reported failure")
+                  return parsed.get("result")
+
+              def list_deployments(self):
+                  result = self.request("GET", "/deployments")
+                  if isinstance(result, dict):
+                      deployments = result.get("deployments")
+                      if deployments is None:
+                          deployments = result.get("items")
+                  elif isinstance(result, list):
+                      deployments = result
+                  else:
+                      deployments = None
+                  if not isinstance(deployments, list) or not deployments:
+                      raise RuntimeError("Live Worker deployment list is empty")
+                  return deployments
+
+              def get_version(self, version_id):
+                  result = self.request("GET", f"/versions/{version_id}")
+                  if isinstance(result, dict) and result.get("id") and result["id"] != version_id:
+                      raise RuntimeError("Fetched Worker version ID does not match requested version")
+                  return result
+
+              def deploy_version(self, version_id):
+                  return self.request(
+                      "POST",
+                      "/deployments",
+                      body={
+                          "strategy": "percentage",
+                          "versions": [{"version_id": version_id, "percentage": 100}],
+                      },
+                  )
+
+
+          def extract_single_active_version(deployments):
+              current = deployments[0]
+              versions = current.get("versions") if isinstance(current, dict) else None
+              if not isinstance(versions, list) or len(versions) != 1:
+                  raise RuntimeError("Expected exactly one active Worker version at 100%")
+              entry = versions[0]
+              version_id = entry.get("version_id") if isinstance(entry, dict) else None
+              percentage = entry.get("percentage") if isinstance(entry, dict) else None
+              if not version_id or float(percentage if percentage is not None else -1) != 100.0:
+                  raise RuntimeError("Expected single active Worker version serving 100% traffic")
+              return version_id
+
+
+          def validate_inputs(previous_id, candidate_id, operation):
+              if operation not in {"verify", "deploy", "rollback"}:
+                  raise ValueError("Expected verify, deploy or rollback")
+              if not UUID_RE.fullmatch(previous_id or ""):
+                  raise ValueError("Expected a UUID for CF_EXPECTED_VERSION_ID")
+              if operation != "verify":
+                  if not UUID_RE.fullmatch(candidate_id or "") or candidate_id == previous_id:
+                      raise ValueError("Expected a distinct UUID for CF_CANDIDATE_VERSION_ID")
+
+
+          def release(deployer, previous_id, candidate_id, operation):
+              validate_inputs(previous_id, candidate_id, operation)
+              live_version = extract_single_active_version(deployer.list_deployments())
+              expected_live = candidate_id if operation == "rollback" else previous_id
+              if live_version != expected_live:
+                  raise RuntimeError("Live Worker version does not match the expected baseline")
+              if operation == "verify":
+                  print("Verified: live Worker serves 100% of the expected version")
+                  return
+              target_id = previous_id if operation == "rollback" else candidate_id
+              deployer.get_version(target_id)
+              deployer.deploy_version(target_id)
+              confirmed_version = extract_single_active_version(deployer.list_deployments())
+              if confirmed_version != target_id:
+                  raise RuntimeError("Worker deployment readback does not match the target version")
+              print(f"{operation} verified: live Worker serves 100% of the target version")
+
+
+          def main():
+              deployer = WorkerDeployer(
+                  os.environ["CF_ACCOUNT_ID"],
+                  os.environ["CF_WORKER_SCRIPT_NAME"],
+                  os.environ["CF_API_TOKEN"],
+              )
+              release(
+                  deployer,
+                  os.environ["CF_EXPECTED_VERSION_ID"],
+                  os.environ.get("CF_CANDIDATE_VERSION_ID", ""),
+                  os.environ["OPERATION"],
+              )
+
+
+          if __name__ == "__main__":
+              main()
+          PY
