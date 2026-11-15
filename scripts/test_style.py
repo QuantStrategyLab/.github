@@ -568,5 +568,30 @@ class ExampleMentionTest(CheckerTestCase):
         self.assertEqual(len(self.messages(report, "language")), 1)
 
 
+class GitVisibilityTest(CheckerTestCase):
+    def test_gitignored_notes_do_not_block_while_staged_notes_do(self):
+        self.write(".gitignore", GITIGNORE_BLOCK)
+        self.write("AGENTS.md", "# rules\n\n" + check_style.CONTENT_BOUNDARY + "\n")
+        self.write("CLAUDE.md", "@AGENTS.md\n")
+        self.write("SECURITY.md", "# Security\n")
+        self.git("init", "--quiet")
+        self.git("config", "user.name", "Test User")
+        self.git("config", "user.email", "test@example.com")
+        self.git("add", ".gitignore", "AGENTS.md", "CLAUDE.md", "SECURITY.md", "README.md")
+
+        self.write("docs/changes/task/change-card.md", "# Card\n")
+        self.write("docs/plans/draft.md", "# Draft\n")
+        self.write("docs/acceptance-policy.md", "# Policy\n")
+
+        code, output = self.run_main()
+        self.assertEqual(code, 0, msg=output)
+
+        self.git("add", "-f", "docs/changes/task/change-card.md", "docs/acceptance-policy.md")
+        blocked_code, blocked_output = self.run_main()
+        self.assertEqual(blocked_code, 1, msg=blocked_output)
+        self.assertIn("docs/changes/task/change-card.md", blocked_output)
+        self.assertIn("docs/acceptance-policy.md", blocked_output)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
