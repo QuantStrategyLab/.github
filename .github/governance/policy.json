@@ -15,15 +15,15 @@
   },
   "r0_paths": [
     "README.md",
-    "CHANGELOG.md",
-    "docs/prose/"
+    "README.zh-CN.md",
+    "profile/README.md"
   ],
   "r2_paths": [
+    "actions/",
     "scripts/",
     ".github/governance/",
     ".github/scripts/",
-    "policy.schema.json",
-    "policy.default.json"
+    "workflow-templates/"
   ],
   "dependabot_template_exemption": true,
   "max_evidence_age_hours": 168

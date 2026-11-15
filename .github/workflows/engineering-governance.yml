@@ -18,28 +18,10 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install verified Gitleaks CLI
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash scripts/install-gitleaks.sh "$RUNNER_TEMP/gitleaks-bin"
       - name: Scan added commits with redacted findings
-        shell: bash
-        env:
-          PR_BASE: ${{ github.event.pull_request.base.sha }}
-          PR_HEAD: ${{ github.event.pull_request.head.sha }}
-          PUSH_BASE: ${{ github.event.before }}
-          PUSH_HEAD: ${{ github.sha }}
-        run: |
-          set -euo pipefail
-          base="${PR_BASE:-$PUSH_BASE}"
-          head="${PR_HEAD:-$PUSH_HEAD}"
-          if [[ -z "$base" || "$base" =~ ^0+$ ]]; then
-            echo "No base commit is available for this event" >&2
-            exit 1
-          fi
-          python3 scripts/scan-secrets.py git . \
-            --gitleaks "$RUNNER_TEMP/gitleaks-bin/gitleaks" --log-opts="$base..$head"
+        uses: Pigbibi/PrGovernance/pr-governance@ccda8de572d2893272b0137526ef3e2d45e5eee7
+        with:
+          mode: scan
 
   commitlint:
     name: Commit message convention
