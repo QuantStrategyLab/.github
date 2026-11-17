@@ -609,7 +609,7 @@ def check_doc_hygiene(root: Path, report: Report, added: set[str]) -> None:
         p for p in markdown
         if p.is_relative_to(root / "docs") and not p.is_relative_to(root / "docs/research")
     }
-    indexes = {p for p in docs if p.name.lower() in {"readme.md", "index.md"}}
+    indexes = {p for p in docs if p.stem.lower().removesuffix(".zh-cn") in {"readme", "index"}}
     if len(docs - indexes) > 5 and root / "docs/README.md" not in indexes:
         report.add("docs_advisory", "docs/ has more than five documents but no docs/README.md index")
 

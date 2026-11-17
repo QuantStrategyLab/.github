@@ -409,6 +409,15 @@ class DocsBaselineTest(CheckerTestCase):
 
 
 class DocumentHygieneTest(CheckerTestCase):
+    def test_bilingual_documents_can_use_their_own_indexes(self):
+        self.write("docs/README.md", "[Guide](guide.md)\n")
+        self.write("docs/README.zh-CN.md", "[指南](guide.zh-CN.md)\n")
+        self.write("docs/guide.md", "# Guide\n")
+        self.write("docs/guide.zh-CN.md", "# 指南\n")
+        report = self.report()
+        check_style.check_doc_hygiene(self.root, report, {"docs/guide.md", "docs/guide.zh-CN.md"})
+        self.assertEqual(report.blocking_findings(), [])
+
     def test_index_supports_markdown_link_titles_and_references(self):
         self.write("docs/guide.md", "# Guide\n")
         for link in (
