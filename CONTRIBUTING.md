@@ -14,7 +14,7 @@ python3 scripts/test_style.py
 python3 scripts/check_style.py --phase 2
 ```
 
-3. Use English Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`) with commit headers at most 72 characters.
+3. Use English Conventional Commits (`feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`) with commit headers at most 72 characters.
 4. Fill in every section of `.github/PULL_REQUEST_TEMPLATE.md`.
 
 ## Security and Content Hygiene
