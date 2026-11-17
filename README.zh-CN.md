@@ -20,7 +20,6 @@ QuantStrategyLab 各仓库共用的组织级文档规范、流程模板与安全
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 贡献流程与提交规范。 |
 | [SECURITY.md](SECURITY.md) | 组织安全漏洞披露说明。 |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | 社区行为准则。 |
-| [风险门禁自动批准提案](PROPOSAL.md) | AI 审查、agent 清除规则与实盘部署授权。 |
 | `AGENTS.md` | 本仓库的 AI 参与与维护规则。 |
 
 ## 参与贡献

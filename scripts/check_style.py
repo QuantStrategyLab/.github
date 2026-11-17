@@ -30,6 +30,7 @@ Exit code 0 when nothing in the blocking set is found.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -405,7 +406,7 @@ def check_naming(root: Path, report: Report) -> None:
                 f"{rel}: English is the base name (section 4); .en.md is not a suffix",
             )
 
-        if rel != "PROPOSAL.md" and core not in CONVENTIONAL_UPPER and core not in GITHUB_TEMPLATE_NAMES:
+        if core not in CONVENTIONAL_UPPER and core not in GITHUB_TEMPLATE_NAMES:
             if core != core.lower():
                 report.add("naming", f"{rel}: file name must be lowercase (section 7)")
             if "_" in core:
@@ -420,6 +421,7 @@ RE_PATCH_PROSE = re.compile(
     re.IGNORECASE,
 )
 RE_PHASE_HEADING = re.compile(r"^#{1,4}\s+.*\bP0[–-]P\d+\b", re.MULTILINE)
+RE_PHASE_SERIES = re.compile(r"\bP[0-6]\s*[–/,-]\s*P[0-6]\b")
 RE_LICENSE_HEADING = re.compile(r"^##\s+(?:License|许可证)\s*$")
 RE_H2_HEADING = re.compile(r"^##\s+\S+")
 MAX_AGENTS_LINES = 120
@@ -466,6 +468,8 @@ def check_readme(root: Path, report: Report) -> None:
                     "content",
                     f"{name}:{lineno}: phase code heading belongs outside reader-facing README (section 5)",
                 )
+            elif RE_PHASE_SERIES.search(masked_line):
+                report.add("docs_advisory", f"{name}:{lineno}: explain or replace internal phase codes (section 5)")
             if RE_LICENSE_HEADING.match(prose_line):
                 seen_license = True
             elif seen_license and RE_H2_HEADING.match(prose_line):
@@ -563,7 +567,7 @@ def check_docs_baseline(root: Path, report: Report, visibility: str = "public") 
     vulnerability disclosure policy, and code of conduct. Private repositories
     only require SECURITY.md for credential handling and rotation.
     """
-    if visibility == "public" or (root / "LICENSE").exists():
+    if visibility == "public":
         required = ["LICENSE", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md"]
         kind = "public"
     else:
@@ -577,27 +581,73 @@ def check_docs_baseline(root: Path, report: Report, visibility: str = "public") 
         )
 
 
-def check_doc_hygiene_advisory(root: Path, report: Report) -> None:
-    """Report non-blocking semantic hygiene cues (orphan docs, zh-CN-only files)."""
-    docs_dir = root / "docs"
-    if docs_dir.is_dir():
-        doc_mds = [p for p in docs_dir.rglob("*.md") if p.name != "README.md"]
-        if len(doc_mds) > 5 and not (docs_dir / "README.md").exists():
-            report.add(
-                "docs_advisory",
-                f"docs/ has {len(doc_mds)} documents but no docs/README.md index",
-            )
-    for path in iter_files(root):
-        if not is_markdown(path):
+MD_DESTINATION = r"(?:<([^>\n]+)>|((?:\\.|[^\s<>()\\]|\([^()\n]*\))+))"
+MD_TITLE = r"(?:\"[^\"\n]*\"|'[^'\n]*'|\([^()\n]*\))"
+INDEX_INLINE = re.compile(r"!?\[[^\[\]\n]*\]\(\s*" + MD_DESTINATION + r"(?:\s+" + MD_TITLE + r")?\s*\)")
+INDEX_DEFINITION = re.compile(r"^ {0,3}\[([^\]\n]+)\]:[ \t]*" + MD_DESTINATION + r"(?:[ \t]+" + MD_TITLE + r")?[ \t]*$", re.M)
+INDEX_REFERENCE = re.compile(r"!?\[([^\[\]\n]+)\](?:\[([^\]\n]*)\])?")
+
+
+def index_targets(text: str):
+    text = blank_code_spans(blank_fenced_blocks(text))
+    references = {}
+    for label, angled, bare in INDEX_DEFINITION.findall(text):
+        references.setdefault(" ".join(label.casefold().split()), angled or bare)
+    text = INDEX_DEFINITION.sub("", text)
+    for angled, bare in INDEX_INLINE.findall(text):
+        yield angled or bare
+    text = INDEX_INLINE.sub("", text)
+    for label, ref in INDEX_REFERENCE.findall(text):
+        target = references.get(" ".join((ref or label).casefold().split()))
+        if target:
+            yield target
+
+
+def check_doc_hygiene(root: Path, report: Report, added: set[str]) -> None:
+    markdown = {p for p in iter_files(root) if is_markdown(p)}
+    docs = {
+        p for p in markdown
+        if p.is_relative_to(root / "docs") and not p.is_relative_to(root / "docs/research")
+    }
+    indexes = {p for p in docs if p.stem.lower().removesuffix(".zh-cn") in {"readme", "index"}}
+    if len(docs - indexes) > 5 and root / "docs/README.md" not in indexes:
+        report.add("docs_advisory", "docs/ has more than five documents but no docs/README.md index")
+
+    links = set()
+    for index in indexes | (markdown & {root / "README.md", root / "README.zh-CN.md"}):
+        for target in index_targets(index.read_text(encoding="utf-8", errors="ignore")):
+            if not target.startswith(("#", "https://", "http://", "mailto:")):
+                path = re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", target.split("#", 1)[0])
+                links.add((index.parent / urllib.parse.unquote(path)).resolve())
+
+    for path in sorted(markdown):
+        rel = path.relative_to(root).as_posix()
+        category = "docs" if rel in added else "docs_advisory"
+        if path in docs - indexes and path.resolve() not in links:
+            report.add(category, f"{rel}: add a link from a README or documentation index")
+        if not path.name.endswith(".zh-CN.md"):
             continue
-        if path.name.endswith(".zh-CN.md"):
-            en_sibling = path.with_name(path.name[:-len(".zh-CN.md")] + ".md")
-            if not en_sibling.exists():
-                rel = path.relative_to(root).as_posix()
-                report.add(
-                    "docs_advisory",
-                    f"{rel}: Chinese sibling has no English source file (section 4)",
-                )
+        english = path.with_name(path.name.removesuffix(".zh-CN.md") + ".md")
+        if english not in markdown:
+            report.add(category, f"{rel}: Chinese sibling has no English source file (section 4)")
+            continue
+        counts = [sum(bool(line.strip()) for line in file.read_text(encoding="utf-8", errors="ignore").splitlines())
+                  for file in (english, path)]
+        if min(counts) >= 10 and max(counts) > 2.5 * min(counts):
+            report.add("docs_advisory", f"{rel}: verify translation coverage ({counts[0]} English / {counts[1]} Chinese lines)")
+
+
+def check_readme_disclosure(root: Path, report: Report, repository: str) -> None:
+    if not repository.endswith(("Platform", "Strategies")):
+        return
+    disclaimer = re.compile(r"not (?:financial|investment) advice|不构成.{0,8}(?:投资|理财)建议", re.I)
+    for name in ("README.md", "README.zh-CN.md"):
+        path = root / name
+        if path.is_file():
+            text = blank_fenced_blocks(path.read_text(encoding="utf-8", errors="ignore"))
+            introduction = "\n".join([line for line in text.splitlines() if line.strip()][:25])
+            if not disclaimer.search(introduction):
+                report.add("docs_advisory", f"{name}: add a trading risk disclaimer near the top (section 3)")
 
 
 QUOTE_MARKS = "\"'\u201c\u201d\u2018\u2019"
@@ -760,9 +810,19 @@ def main(argv: list[str] | None = None) -> int:
         "--visibility", choices=("public", "private"), default="public",
         help="private demotes publication rules to notes; default treats the repository as public",
     )
+    parser.add_argument("--base-ref", help="compare against this Git ref to enforce rules on added documents")
     args = parser.parse_args(argv)
 
     root = Path(args.root).resolve()
+    added = set()
+    if args.base_ref:
+        result = subprocess.run(
+            ["git", "diff", "--diff-filter=AR", "--name-only", "-z", args.base_ref, "HEAD", "--"],
+            cwd=root, capture_output=True, check=False,
+        )
+        if result.returncode:
+            parser.error("cannot compare documents with --base-ref")
+        added = set(result.stdout.decode("utf-8", errors="surrogateescape").split("\0"))
     blocking_categories = set(PHASE_BLOCKING[args.phase])
     if args.visibility == "private":
         blocking_categories -= PUBLICATION_CATEGORIES
@@ -774,7 +834,9 @@ def main(argv: list[str] | None = None) -> int:
     check_agent_files(root, report)
     check_language(root, report)
     check_docs_baseline(root, report, visibility=args.visibility)
-    check_doc_hygiene_advisory(root, report)
+    check_doc_hygiene(root, report, added)
+    if args.visibility == "public":
+        check_readme_disclosure(root, report, os.getenv("GITHUB_REPOSITORY", "").rsplit("/", 1)[-1])
     check_leaks(root, report)
     check_internal_paths(root, report)
 
