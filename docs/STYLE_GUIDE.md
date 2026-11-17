@@ -252,30 +252,26 @@ When a repository keeps a changelog, follow Keep a Changelog. The file is `CHANG
 Write PR descriptions in English. Use the repository's template and keep the sections that apply; write "none" where a section of the template does not apply.
 
 ```markdown
-## Summary
+## AI assistance
 
-<One or two sentences on what changes.>
+<Which AI tool and model were used? Write "None" if no AI was used.>
+
+## What changed
+
+- <Observable change.>
+- <Observable change.>
+
+## How verified
+
+<Commands run and their result. Explain any checks that could not run. No raw logs.>
 
 ## Why
 
 <The problem or motivation.>
 
-## Changes
+## Risk
 
-- <Observable change.>
-- <Observable change.>
-
-## Testing
-
-<Commands run and their result. Link to CI. No raw logs.>
-
-## Risk and rollback
-
-<Blast radius and how to revert.>
-
-## Breaking changes
-
-<What breaks and the migration. Write "none" if none.>
+<Risk tier, affected paths, compatibility/operational impact, and rollback.>
 ```
 
 Do not paste internal job logs, agent transcripts, evidence tables, or approval notes into a PR description. A documentation-only PR should say so in the Summary.

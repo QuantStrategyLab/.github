@@ -56,7 +56,7 @@ ORGS = {
 LINK = re.compile(r"\[[^\]]*\]\(([^)\s]+)\)")
 # https://github.com/<owner>/<repo>/(blob|tree)/<ref>/<path>
 GH_REF = re.compile(
-    r"https?://github\.com/([^/]+)/([^/]+)/(?:blob|tree)/([^/]+)/(.+?)(?:#.*)?$"
+    r"https?://github\.com/([^/]+)/([^/]+)/(blob|tree)/([^/]+)/(.+?)(?:#.*)?$"
 )
 SHA = re.compile(r"[0-9a-f]{7,40}")
 
@@ -182,6 +182,12 @@ def scan(repos: dict[str, Path]) -> tuple[list[dict], list[dict], int]:
                 }
                 if note:
                     unverifiable.append({**record, "reason": note})
+                elif kind == "github-tree":
+                    prefix = target_path.rstrip("/") + "/"
+                    if target_path not in files[target_repo] and not any(
+                        p.startswith(prefix) for p in files[target_repo]
+                    ):
+                        broken.append(record)
                 elif target_path not in files[target_repo]:
                     broken.append(record)
     return broken, unverifiable, pinned
@@ -193,13 +199,14 @@ def classify(
     """Return (target_repo, target_path, kind, unverifiable_reason)."""
     m = GH_REF.match(url)
     if m:
-        _, target_repo, ref, path = m.groups()
+        _, target_repo, ref_kind, ref, path = m.groups()
         if SHA.fullmatch(ref):
             return target_repo, path, "pinned", "commit sha"
+        kind = f"github-{ref_kind}"
         branch = branches.get(target_repo)
         if branch is not None and ref != branch:
-            return target_repo, path, "github-blob", f"ref {ref} is not the default branch"
-        return target_repo, path, "github-blob", ""
+            return target_repo, path, kind, f"ref {ref} is not the default branch"
+        return target_repo, path, kind, ""
 
     if url.startswith(("http", "#", "mailto")):
         return None
