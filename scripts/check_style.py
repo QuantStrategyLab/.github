@@ -581,6 +581,28 @@ def check_docs_baseline(root: Path, report: Report, visibility: str = "public") 
         )
 
 
+MD_DESTINATION = r"(?:<([^>\n]+)>|((?:\\.|[^\s<>()\\]|\([^()\n]*\))+))"
+MD_TITLE = r"(?:\"[^\"\n]*\"|'[^'\n]*'|\([^()\n]*\))"
+INDEX_INLINE = re.compile(r"!?\[[^\[\]\n]*\]\(\s*" + MD_DESTINATION + r"(?:\s+" + MD_TITLE + r")?\s*\)")
+INDEX_DEFINITION = re.compile(r"^ {0,3}\[([^\]\n]+)\]:[ \t]*" + MD_DESTINATION + r"(?:[ \t]+" + MD_TITLE + r")?[ \t]*$", re.M)
+INDEX_REFERENCE = re.compile(r"!?\[([^\[\]\n]+)\](?:\[([^\]\n]*)\])?")
+
+
+def index_targets(text: str):
+    text = blank_code_spans(blank_fenced_blocks(text))
+    references = {}
+    for label, angled, bare in INDEX_DEFINITION.findall(text):
+        references.setdefault(" ".join(label.casefold().split()), angled or bare)
+    text = INDEX_DEFINITION.sub("", text)
+    for angled, bare in INDEX_INLINE.findall(text):
+        yield angled or bare
+    text = INDEX_INLINE.sub("", text)
+    for label, ref in INDEX_REFERENCE.findall(text):
+        target = references.get(" ".join((ref or label).casefold().split()))
+        if target:
+            yield target
+
+
 def check_doc_hygiene(root: Path, report: Report, added: set[str]) -> None:
     markdown = {p for p in iter_files(root) if is_markdown(p)}
     docs = {
@@ -593,10 +615,10 @@ def check_doc_hygiene(root: Path, report: Report, added: set[str]) -> None:
 
     links = set()
     for index in indexes | (markdown & {root / "README.md", root / "README.zh-CN.md"}):
-        text = blank_code_spans(blank_fenced_blocks(index.read_text(encoding="utf-8", errors="ignore")))
-        for target in re.findall(r"\[[^\]]*\]\(([^)\s]+)\)", text):
+        for target in index_targets(index.read_text(encoding="utf-8", errors="ignore")):
             if not target.startswith(("#", "https://", "http://", "mailto:")):
-                links.add((index.parent / urllib.parse.unquote(target.split("#", 1)[0])).resolve())
+                path = re.sub(r"\\([!-/:-@\[-`{-~])", r"\1", target.split("#", 1)[0])
+                links.add((index.parent / urllib.parse.unquote(path)).resolve())
 
     for path in sorted(markdown):
         rel = path.relative_to(root).as_posix()

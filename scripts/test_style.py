@@ -409,6 +409,20 @@ class DocsBaselineTest(CheckerTestCase):
 
 
 class DocumentHygieneTest(CheckerTestCase):
+    def test_index_supports_markdown_link_titles_and_references(self):
+        self.write("docs/guide.md", "# Guide\n")
+        for link in (
+            '[Guide](guide.md "Guide title")\n',
+            '[Guide][guide-ref]\n\n[guide-ref]: guide.md\n',
+            '[Guide][]\n\n[guide]: <guide.md> "Guide title"\n',
+            '[Guide]\n\n[guide]: guide.md\n',
+        ):
+            with self.subTest(link=link):
+                self.write("docs/README.md", link)
+                report = self.report()
+                check_style.check_doc_hygiene(self.root, report, {"docs/guide.md"})
+                self.assertEqual(report.blocking_findings(), [])
+
     def test_new_orphan_blocks_and_research_archive_is_exempt(self):
         self.write("docs/new.md", "# New\n")
         self.write("docs/research/archive.md", "# Archive\n")
