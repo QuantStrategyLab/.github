@@ -38,6 +38,7 @@ jobs:
       - name: Check out the repository under review
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
+          fetch-depth: 2
           persist-credentials: false
           path: target
 
@@ -79,11 +80,14 @@ jobs:
           # deployment document may need the real host name to be usable.
           VISIBILITY: ${{ github.event.repository.private && 'private' || 'public' }}
         run: |
-          args="--root target --phase 2 --visibility $VISIBILITY"
-          if [ "$MODE" = "advisory" ]; then
-            args="$args --advisory"
+          args=(--root target --phase 2 --visibility "$VISIBILITY")
+          if [ "$GITHUB_EVENT_NAME" = "pull_request" ]; then
+            args+=(--base-ref 'HEAD^1')
           fi
-          python policy/scripts/check_style.py $args
+          if [ "$MODE" = "advisory" ]; then
+            args+=(--advisory)
+          fi
+          python policy/scripts/check_style.py "${args[@]}"
 
       # Whoever reads a failing check needs the rule and the reason, not just
       # the finding. This is the only place the standard is stated to someone

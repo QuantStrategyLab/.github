@@ -27,7 +27,7 @@ python3 scripts/check_style.py --phase 2
 ## Naming and documentation
 
 - English is default; `.zh-CN.md` siblings are optional and kept accurate when updated.
-- Document filenames use lowercase kebab-case (`README.md`, `AGENTS.md`, `CLAUDE.md`, `PROPOSAL.md` keep standard casing).
+- Document filenames use lowercase kebab-case (`README.md`, `AGENTS.md`, `CLAUDE.md` keep standard casing).
 - Update `README.md` / `README.zh-CN.md` only when user-visible install, configuration, CLI, or public API behavior changes; never append `this PR` / `remains unchanged` notes, `P0-P6` phase headings, or sections after `## License` / `## 许可证`.
 
 <!-- repository-files:begin -->
@@ -53,4 +53,4 @@ python3 scripts/check_style.py --phase 2
 
 ## Operational authorization
 
-- Live-trading deployments, Kelly/stop-loss changes, real Secrets/IAM mutations, and destructive deletions always stay OFF unless explicitly authorized by the owner via [PROPOSAL.md](PROPOSAL.md#live-deployment-boundary).
+- Live-trading deployments, Kelly/stop-loss changes, real Secrets/IAM mutations, and destructive deletions always stay OFF unless explicitly authorized by the owner via [PROPOSAL.md](docs/deployment-workflows.md#live-deployment-boundary).

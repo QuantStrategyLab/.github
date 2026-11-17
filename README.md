@@ -20,7 +20,6 @@ Organization-wide baseline files, style guide, and reusable workflow templates f
 | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution workflow and commit conventions. |
 | [SECURITY.md](SECURITY.md) | Organization security reporting policy. |
 | [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) | Community code of conduct. |
-| [Automated risk approval proposal](PROPOSAL.md) | Agent-cleared source changes and live-deployment authorization. |
 | `AGENTS.md` | AI contribution and maintenance rules for this repository. |
 
 ## Contributing

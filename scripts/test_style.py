@@ -99,11 +99,12 @@ class NamingTest(CheckerTestCase):
         check_style.check_naming(self.root, report)
         self.assertTrue(any(".en.md is not a suffix" in m for m in self.messages(report, "naming")))
 
-    def test_root_proposal_has_its_owner_requested_name(self):
+    def test_root_proposal_uses_normal_filename_rules(self):
         self.write("PROPOSAL.md", "# Proposed governance change\n")
         report = self.report()
         check_style.check_naming(self.root, report)
-        self.assertEqual(self.messages(report, "naming"), [])
+
+        self.assertTrue(any("lowercase" in m for m in self.messages(report, "naming")))
 
     def test_nested_proposal_still_requires_lowercase(self):
         self.write("docs/PROPOSAL.md", "# x\n")
@@ -396,6 +397,7 @@ class DocsBaselineTest(CheckerTestCase):
 
     def test_private_repository_needs_only_the_credential_doc(self):
         self.write("SECURITY.md", "# Credentials\n")
+        self.write("LICENSE", "MIT\n")
         report = self.report()
         check_style.check_docs_baseline(self.root, report, visibility="private")
         self.assertEqual(self.messages(report, "docs"), [])
@@ -404,6 +406,36 @@ class DocsBaselineTest(CheckerTestCase):
         report = self.report()
         check_style.check_docs_baseline(self.root, report, visibility="private")
         self.assertTrue(any("SECURITY.md" in m for m in self.messages(report, "docs")))
+
+
+class DocumentHygieneTest(CheckerTestCase):
+    def test_new_orphan_blocks_and_research_archive_is_exempt(self):
+        self.write("docs/new.md", "# New\n")
+        self.write("docs/research/archive.md", "# Archive\n")
+        report = self.report()
+        check_style.check_doc_hygiene(self.root, report, {"docs/new.md", "docs/research/archive.md"})
+        self.assertEqual(len(report.blocking_findings()), 1)
+        self.assertIn("docs/new.md", report.blocking_findings()[0][1])
+
+    def test_new_translation_requires_source_and_checks_existing_pair_ratio(self):
+        self.write("docs/README.md", "[New](new.zh-CN.md) · [Runbook](runbook.md) · [中文](runbook.zh-CN.md)\n")
+        self.write("docs/new.zh-CN.md", "# 新文档\n")
+        self.write("docs/runbook.md", "Line\n" * 30)
+        self.write("docs/runbook.zh-CN.md", "一行\n" * 10)
+        report = self.report()
+        check_style.check_doc_hygiene(self.root, report, {"docs/new.zh-CN.md"})
+        self.assertEqual(len(report.blocking_findings()), 1)
+        self.assertIn("no English source", report.blocking_findings()[0][1])
+        self.assertTrue(any("translation coverage" in text for _, text in report.advisory_findings()))
+
+    def test_top_of_platform_readme_requires_disclaimer(self):
+        report = self.report()
+        check_style.check_readme_disclosure(self.root, report, "ExamplePlatform")
+        self.assertTrue(any("disclaimer" in text for _, text in report.advisory_findings()))
+        self.write("README.md", "# Example\n\nThis software is not investment advice.\n")
+        report = self.report()
+        check_style.check_readme_disclosure(self.root, report, "ExamplePlatform")
+        self.assertEqual(report.findings, [])
 
 
 class PhaseTest(CheckerTestCase):

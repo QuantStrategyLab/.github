@@ -113,6 +113,7 @@ Developer documentation is normally written in English, which keeps code, comman
 - A project may keep a Simplified Chinese README, guides or reference pages when its readers need them. Keep an existing translation accurate when you change the source it covers; do not invent a translation or a parallel file that no one maintains.
 - Repositories are not required to mirror READMEs section for section, to use a fixed set of headings, or to ship both English and Chinese versions. Preserve an existing bilingual pair where it is useful, and let either side carry project-specific sections.
 - A translation sibling is named `<name>.zh-CN.md`, or `<name>.md` for an English sibling of a Chinese file. A translation must not contain information missing from its source. Mark a translation that has fallen behind, or update it with the change, rather than leaving it silently stale.
+- Add the English source with each new Chinese translation. The checker flags substantial differences in length for a coverage review.
 - Code identifiers, file names, environment variable names, and API names stay in English, including inside Chinese text.
 - Pull request titles and descriptions and commit messages are normally English. A repository or team that works in another language may use it consistently; do not mix languages within one PR description without a reason.
 
