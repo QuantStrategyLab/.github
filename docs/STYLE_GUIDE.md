@@ -281,7 +281,7 @@ Commit messages:
 
 - Imperative mood: "add order preview", not "added" or "adds".
 - Subject of 72 characters or fewer.
-- Conventional Commits prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`.
+- Conventional Commits prefix: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `perf`, `ci`, `build`.
 - A body when the change needs context. No task codes or round numbers.
 
 Sentence-case subjects are allowed; commitlint ignores merge commits.
