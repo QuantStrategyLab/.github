@@ -13,7 +13,7 @@ interfaces and data formats.
 
 ## Repository responsibilities
 
-The following map covers 26 repositories. Groups describe responsibility, not a
+The following map covers 29 repositories. Groups describe responsibility, not a
 requirement to combine repositories or release them together.
 
 | Responsibility | Repositories | Owned behavior |
@@ -27,7 +27,8 @@ requirement to combine repositories or release them together.
 | AI task service | `QuantAIService` | Task and advisory result contracts, model-service integration and related clients. |
 | Connection operations | `IBKRGatewayManager`, `SchwabTokenAutoRefresher` | Gateway lifecycle and credential-renewal operations. |
 | Advisory research | `QuantAdvisorResearch`, `PoliticalEventTrackingResearch` | Research reports and event context under the advisory boundary. |
-| Organization conventions | `.github` | Shared documentation, contribution templates, opt-in secret scans and organization metadata. |
+| Internal operations (private) | `QuantInternalOps` | Private deployment wrappers, GCP free-tier guards, operational runbooks and internal progress tracking. |
+| Organization conventions and site | `.github`, `quantstrategylab.github.io`, `MonitorDeployPilot` | Shared documentation, contribution templates, secret scans, organization landing site and isolated deployment workflow pilot. |
 
 Supported modes and broker capabilities belong to the relevant platform
 repository. A shadow implementation or an offline adapter does not establish

@@ -19,8 +19,8 @@ needed to reproduce.
 A report about a documentation repository or a shared workflow is in scope when
 it would let someone change what a build or a published document says. A report
 about a live deployment belongs with the repository that owns the deployment;
-that repository's own policy names where its credentials live and how they are
-rotated.
+credential storage and rotation procedures live in the private operations
+repository, not in public security policies.
 
 ## What happens next
 
