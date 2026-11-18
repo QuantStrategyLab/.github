@@ -203,3 +203,14 @@ with production authority, extra triggers/targets and changes to the deployment
 trust boundary. YAML alone cannot enforce cloud trust. Settings/trust writes must
 remain outside implementation and merge agents' authority. Actual Secrets/IAM
 changes and destructive deletion use similarly owner-protected scoped workflows.
+
+## Cloudflare Isolation and Credential Hygiene
+
+- Keep `QuantStrategyLab` edge Workers, KV namespaces, and R2 archive buckets in a
+  dedicated Cloudflare Account isolated from personal or campus projects.
+- Scope Cloudflare API tokens strictly to the target account and required resources
+  (avoid account-wide or global keys), and enforce a 90-180 day expiration.
+- Never create non-expiring Google Cloud service account JSON keys; use Workload
+  Identity Federation (WIF) for CI/CD and short-lived impersonation for local ops.
+- Keep smoke-test Workers ephemeral: delete temporary smoke Workers and KV
+  namespaces immediately after validation.
