@@ -31,17 +31,25 @@ Rules for organization and repository configuration:
 Prefer short-lived, scoped tokens minted at runtime over static long-lived
 credentials:
 
-1. **GitHub automation**: Prefer a GitHub App (`QSL_GITHUB_APP_ID` in
-   Variables and `QSL_GITHUB_APP_PRIVATE_KEY` in Secrets) with
-   `actions/create-github-app-token` pinned to a full commit SHA. GitHub App
-   installation tokens expire automatically after one hour and do not depend on
-   a user account's expiring personal access token (PAT) such as
-   `QSL_REPO_SYNC_TOKEN` or `SNAPSHOT_REPOSITORY_TOKEN`. By default, the
-   minted token inherits all permissions granted to the App installation; the
-   workflow `permissions:` block restricts only `GITHUB_TOKEN`. Always pass
-   explicit `permission-*` inputs (and `repositories` when narrowing target
-   scope) to `actions/create-github-app-token` so the minted token receives
-   only the permissions that job needs.
+1. **GitHub automation**: Prefer dedicated GitHub Apps (App ID in Variables and
+   private key in Secrets) with `actions/create-github-app-token` pinned to a
+   full commit SHA:
+   - Pin sync workflows use the dedicated pin-sync GitHub App
+     (`QSL_GITHUB_APP_ID` in Variables and `QSL_GITHUB_APP_PRIVATE_KEY` in
+     Secrets).
+   - Read-only drift checks use the dedicated read-only drift GitHub App
+     (`QSL_DRIFT_APP_ID` in Variables and `QSL_DRIFT_APP_PRIVATE_KEY` in
+     Secrets).
+
+   GitHub App installation tokens expire automatically after one hour and do
+   not depend on a user account's expiring personal access token (PAT) such as
+   `SNAPSHOT_REPOSITORY_TOKEN`. The legacy `QSL_REPO_SYNC_TOKEN` PAT has been
+   retired and removed from organization secrets. By default, the minted token
+   inherits all permissions granted to the App installation; the workflow
+   `permissions:` block restricts only `GITHUB_TOKEN`. Always pass explicit
+   `permission-*` inputs (and `repositories` when narrowing target scope) to
+   `actions/create-github-app-token` so the minted token receives only the
+   permissions that job needs.
 2. **Cloud authentication**: Prefer OpenID Connect (OIDC) federation over
    static service account keys. For Google Cloud, configure Workload Identity
    Federation (`GCP_WORKLOAD_IDENTITY_PROVIDER`) bound to the repository,
