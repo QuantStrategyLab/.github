@@ -19,13 +19,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - name: Check out the caller with full history
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
           path: source
       - name: Check out trusted scanner and shared configuration
-        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: QuantStrategyLab/.github
           # Pin the helper commit; changes to helpers require an explicit pin update.
