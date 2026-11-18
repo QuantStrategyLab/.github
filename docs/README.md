@@ -7,4 +7,5 @@
 - [Incremental architecture boundaries](adr/0001-incremental-architecture-boundaries.md)
 - [Advisory research boundary](advisory-research-boundary.md)
 - [Reusable deployment workflows](deployment-workflows.md)
+- [Secrets and GitHub App governance](secrets-and-app-governance.md)
 - [Secret scanning](secret-scanning.md)
