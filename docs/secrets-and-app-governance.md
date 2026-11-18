@@ -34,19 +34,20 @@ credentials:
 1. **GitHub automation**: Prefer dedicated GitHub Apps (App ID in Variables and
    private key in Secrets) with `actions/create-github-app-token` pinned to a
    full commit SHA:
-   - Pin sync uses `qsl-qpk-pin-sync` (`QSL_GITHUB_APP_ID` in Variables and
-     `QSL_GITHUB_APP_PRIVATE_KEY` in Secrets).
-   - Read-only drift checks use `qsl-drift-readonly` (`QSL_DRIFT_APP_ID` in
-     Variables and `QSL_DRIFT_APP_PRIVATE_KEY` in Secrets).
+   - Pin sync workflows use the dedicated pin-sync GitHub App
+     (`QSL_GITHUB_APP_ID` in Variables and `QSL_GITHUB_APP_PRIVATE_KEY` in
+     Secrets).
+   - Read-only drift checks use the dedicated read-only drift GitHub App
+     (`QSL_DRIFT_APP_ID` in Variables and `QSL_DRIFT_APP_PRIVATE_KEY` in
+     Secrets).
 
    GitHub App installation tokens expire automatically after one hour and do
    not depend on a user account's expiring personal access token (PAT) such as
    `SNAPSHOT_REPOSITORY_TOKEN`. The legacy `QSL_REPO_SYNC_TOKEN` PAT has been
-   retired and removed from both `QuantPlatformKit` and `QuantStrategyLab`
-   organization secrets. By default, the minted token inherits all permissions
-   granted to the App installation; the workflow `permissions:` block restricts
-   only `GITHUB_TOKEN`. Always pass explicit `permission-*` inputs (and
-   `repositories` when narrowing target scope) to
+   retired and removed from organization secrets. By default, the minted token
+   inherits all permissions granted to the App installation; the workflow
+   `permissions:` block restricts only `GITHUB_TOKEN`. Always pass explicit
+   `permission-*` inputs (and `repositories` when narrowing target scope) to
    `actions/create-github-app-token` so the minted token receives only the
    permissions that job needs.
 2. **Cloud authentication**: Prefer OpenID Connect (OIDC) federation over
