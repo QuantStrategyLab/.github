@@ -1,6 +1,6 @@
 # ADR 0001: Evolve architecture through compatible boundaries
 
-Status: proposed
+Status: accepted
 
 ## Context
 
