@@ -306,6 +306,12 @@ class AgentFileTest(CheckerTestCase):
         self.assertTrue(any("engineering.md is retired" in m for m in found))
         self.assertTrue(any("exceeds 120 lines" in m for m in found))
 
+    def test_gemini_md_keeps_conventional_uppercase_naming(self):
+        self.write("GEMINI.md", "@AGENTS.md\n")
+        report = self.report()
+        check_style.check_naming(self.root, report)
+        self.assertEqual(self.messages(report, "naming"), [])
+
 
 class LanguageTest(CheckerTestCase):
     """Section 2 — the word list reports usage, not mention."""

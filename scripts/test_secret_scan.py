@@ -136,6 +136,61 @@ class SecretScanTest(unittest.TestCase):
         summary = self.scan(1)
         self.assertTrue(any(x["rule"] == "github-pat" for x in summary["findings"]))
 
+    def test_gcp_wif_project_number_rule(self):
+        real_wif = "projects/" + "123456789012" + "/locations/global/workloadIdentityPools/github-actions"
+        self.write("wf.yml", "workload_identity_provider: " + real_wif + "\n")
+        summary = self.scan(1)
+        self.assertTrue(any(x["rule"] == "gcp-wif-project-number" for x in summary["findings"]))
+        self.write("wf.yml", "workload_identity_provider: projects/<project-number>/locations/global/workloadIdentityPools/github-actions\n")
+        self.scan(0)
+
+    def test_gcs_real_bucket_rule(self):
+        real_bucket = "gs://" + "private-prod-" + "bucket-99/path"
+        self.write("cfg.txt", real_bucket + "\n")
+        summary = self.scan(1)
+        self.assertTrue(any(x["rule"] == "gcs-real-bucket" for x in summary["findings"]))
+        for clean in ("gs://example-research-bucket/path\n", "gs://<bucket>/path\n"):
+            self.write("cfg.txt", clean)
+            self.scan(0)
+
+    def test_public_ipv4_rule(self):
+        pub_ip = ".".join(["198", "18", "42", "7"])
+        self.write("host.md", "Host " + pub_ip + "\n")
+        summary = self.scan(1)
+        self.assertTrue(any(x["rule"] == "public-ipv4" for x in summary["findings"]))
+        safe_text = "\n".join([
+            "10.0.1.5",
+            "172.16.4.2",
+            "192.168.1.10",
+            "127.0.0.1",
+            "0.0.0.0",
+            "192.0.2.15",
+            "198.51.100.25",
+            "203.0.113.9",
+            "SDK version 1.2.3.4",
+            "pkg==2.14.0.1",
+        ]) + "\n"
+        self.write("host.md", safe_text)
+        self.scan(0)
+        mixed_line = '{"sdk_version": "1.2.3.4", "host": "' + pub_ip + '"}\n'
+        self.write("host.md", mixed_line)
+        summary = self.scan(1)
+        self.assertTrue(any(x["rule"] == "public-ipv4" for x in summary["findings"]))
+
+    def test_personal_tax_or_capital_rule(self):
+        for phrase in (
+            "China " + "tax " + "resident",
+            "税务" + "居民",
+            "本人" + "资金",
+            "My " + "account " + "is funded",
+        ):
+            with self.subTest(phrase=phrase):
+                self.write("note.md", phrase + "\n")
+                summary = self.scan(1)
+                self.assertTrue(any(x["rule"] == "personal-tax-or-capital" for x in summary["findings"]))
+        self.write("note.md", "Configurable tax profile (example 20% tax) with example USD 1,500 capital.\n")
+        self.scan(0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
