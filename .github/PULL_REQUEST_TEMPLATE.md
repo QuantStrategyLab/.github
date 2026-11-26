@@ -17,3 +17,5 @@ List the checks run and their results. Explain any checks that could not run.
 ## Risk
 
 <!-- Record the risk tier, affected paths and relevant compatibility or operational impact. -->
+
+- [ ] 正文/提交信息不含个人情况和真实资源名

@@ -176,6 +176,17 @@ Version these deliberately, with the context a future reader needs. Do not delet
 
 If the content is useful internally, move it to a private location. Removing it from the current tree does not remove it from git history; see section 14.
 
+### Public material and personal data
+
+Apply these four rules to every public repository, pull request description, issue, commit message, and code comment:
+
+a. Never disclose personal information of the owner or any individual: nationality, tax residency, capital or account size, broker identities or accounts, home address, email address, or phone number. Model tax or capital assumptions as configurable parameters with synthetic examples (`example 20% tax`, `example USD 1,500`).
+b. Never commit real infrastructure identifiers: GCP project numbers or project IDs, bucket names, server IP addresses or hostnames, or Workload Identity Pool paths. Read non-secret deployment settings from Actions `vars.*` and private identifiers or credentials from `secrets.*` / protected config, verifying their existence before merging; use placeholders (`gs://<bucket>/...`, `<project-number>`, `<host>`) in docs.
+c. Hashing or truncating an identifier is not anonymization.
+d. When an existing leak is found, apply a forward fix first (parameterize or replace with placeholders), then report it to the owner so the owner can decide whether to rewrite history. Agents must not rewrite history or alter branch protection autonomously.
+
+Unified agent rule files stay single-sourced in `AGENTS.md`. `CLAUDE.md` and `GEMINI.md` each contain only `@AGENTS.md`, and Gemini CLI environments can set `context.fileName = ["AGENTS.md", "GEMINI.md"]` in `~/.gemini/settings.json`.
+
 ## 6. Where internal notes go
 
 Disposable internal notes do not belong in a public repository. Keep them in the private ops repository, in approved protected storage, or in a local folder outside any repository. If a note has to live in the working tree, put it in an ignored path and never commit it.
@@ -212,7 +223,7 @@ docs/
   <name>.zh-CN.md       optional translation sibling
 ```
 
-- Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional documentation names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`, `STYLE_GUIDE`.
+- Lowercase kebab-case file names: `order-routing.md`, not `OrderRouting.md` or `order_routing.md`. Conventional documentation names stay uppercase: `README`, `CONTRIBUTING`, `CHANGELOG`, `SECURITY`, `CODE_OF_CONDUCT`, `ARCHITECTURE`, `CONFIGURATION`, `GLOSSARY`, `STYLE_GUIDE`, `AGENTS`, `CLAUDE`, `GEMINI`.
 - No dates in file names, except under `docs/research/`. A date goes stale when it names something that keeps changing, which is why it is banned elsewhere. A research record does not keep changing: it is a snapshot of one date, and two analyses of the same subject from different months are different documents. Dropping the date leaves them competing for one name.
 - ADRs live at `docs/adr/NNNN-title.md`, for example `docs/adr/0007-config-layering.md`. Number them sequentially; never reuse or renumber one. They are the other kind of record, and a sequence number identifies them better than a date.
 

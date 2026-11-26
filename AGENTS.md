@@ -27,7 +27,7 @@ python3 scripts/check_style.py --phase 2
 ## Naming and documentation
 
 - English is default; `.zh-CN.md` siblings are optional and kept accurate when updated.
-- Document filenames use lowercase kebab-case (`README.md`, `AGENTS.md`, `CLAUDE.md` keep standard casing).
+- Document filenames use lowercase kebab-case (`README.md`, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md` keep standard casing). Store rules once in `AGENTS.md`; `CLAUDE.md` and `GEMINI.md` contain only `@AGENTS.md`.
 - Update `README.md` / `README.zh-CN.md` only when user-visible install, configuration, CLI, or public API behavior changes; never append `this PR` / `remains unchanged` notes, `P0-P6` phase headings, or sections after `## License` / `## 许可证`.
 
 <!-- repository-files:begin -->
@@ -41,8 +41,8 @@ python3 scripts/check_style.py --phase 2
 - Do not change organization automation or branch protection without an owner request.
 
 <!-- content-boundary:begin -->
-- Public material carries no real resource names or accounts: use `gs://<bucket>/...`, `<account-id>`, and synthetic examples.
-- Read bucket names, accounts, and hostnames from `vars.*`, env, or protected config; never commit hashes or identifiers that resolve to private objects.
+- Public repos, PRs, issues, commits, and comments carry no personal details (nationality/tax residency, capital/account size, broker account, address, email, phone) or real infra IDs (GCP project number/ID, bucket, server IP/hostname, WIF path). Use `gs://<bucket>/...`, `<project-number>`, `<host>`, and obvious synthetic examples (`example 20% tax`, `example USD 1,500`); hashing/truncating IDs does not anonymize.
+- Read deployment config from Actions `vars.*` and private identifiers or credentials from `secrets.*` / protected config, confirming they exist before merging; remediate leaks with a forward fix first, then report to the owner (never rewrite history autonomously).
 - Judge whether a change is clean by `git diff` and `git ls-files`; `.gitignore` affects untracked files only.
 <!-- content-boundary:end -->
 
@@ -53,4 +53,4 @@ python3 scripts/check_style.py --phase 2
 
 ## Operational authorization
 
-- Live-trading deployments, Kelly/stop-loss changes, real Secrets/IAM mutations, and destructive deletions always stay OFF unless explicitly authorized by the owner via [PROPOSAL.md](docs/deployment-workflows.md#live-deployment-boundary).
+- Live-trading deployments, Kelly/stop-loss changes, real Secrets/IAM mutations, and destructive deletions always stay OFF unless explicitly authorized by the owner via [PROPOSAL.md](docs/deployment-workflows.md#live-deployment-boundary). Track org-wide remediation progress only in `QuantInternalOps` issue #1.
