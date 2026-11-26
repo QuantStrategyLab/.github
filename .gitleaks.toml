@@ -1549,10 +1549,11 @@ paths = ['''(?:^|/)scripts/test_style\.py$''']
 [[rules]]
 id = "public-ipv4"
 description = "Public IPv4 literal outside RFC1918, loopback, and documentation ranges"
-regex = '''\b(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3}\b'''
+regex = '''(?i)(?:(?:version|release|semver|chrome|node|python|sdk)[\s:="']{1,6}|(?:^|[\s"'(,=:@<>])v|(?:==|>=|<=|~=|\^|@v?)\s*)?\b((?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?:\.(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)){3})\b(?:[-+][A-Za-z0-9]+)?'''
+secretGroup = 1
 [[rules.allowlists]]
 description = "Allow private, loopback, unspecified, and RFC5737 documentation IPv4 ranges"
-regexTarget = "match"
+regexTarget = "secret"
 regexes = [
     '''^10\.''',
     '''^172\.(?:1[6-9]|2\d|3[01])\.''',
@@ -1564,12 +1565,13 @@ regexes = [
     '''^203\.0\.113\.''',
 ]
 [[rules.allowlists]]
-description = "Allow dotted-quad version numbers and release identifiers"
-regexTarget = "line"
+description = "Allow dotted-quad version numbers and release identifiers without exempting the whole line"
+regexTarget = "match"
 regexes = [
-    '''(?i)(?:version|release|semver|chrome|node|python|sdk)\D{0,12}\d+\.\d+\.\d+\.\d+''',
-    '''(?i)(?:\bv|==|>=|<=|~=|\^|@v?)\d+\.\d+\.\d+\.\d+''',
-    '''\d+\.\d+\.\d+\.\d+[-+][A-Za-z0-9]''',
+    '''(?i)^(?:version|release|semver|chrome|node|python|sdk)[\s:="']{1,6}\d+\.\d+\.\d+\.\d+$''',
+    '''(?i)^(?:^|[\s"'(,=:@<>])v\d+\.\d+\.\d+\.\d+$''',
+    '''(?i)^(?:==|>=|<=|~=|\^|@v?)\s*\d+\.\d+\.\d+\.\d+$''',
+    '''\d+\.\d+\.\d+\.\d+[-+][A-Za-z0-9]+$''',
 ]
 
 [[rules]]

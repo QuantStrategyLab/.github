@@ -172,6 +172,10 @@ class SecretScanTest(unittest.TestCase):
         ]) + "\n"
         self.write("host.md", safe_text)
         self.scan(0)
+        mixed_line = '{"sdk_version": "1.2.3.4", "host": "' + pub_ip + '"}\n'
+        self.write("host.md", mixed_line)
+        summary = self.scan(1)
+        self.assertTrue(any(x["rule"] == "public-ipv4" for x in summary["findings"]))
 
     def test_personal_tax_or_capital_rule(self):
         for phrase in (
