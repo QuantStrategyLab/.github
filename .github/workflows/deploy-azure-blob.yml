@@ -9,7 +9,7 @@ on:
         required: true
         type: string
       source-artifact:
-        description: Same-run artifact containing the three reviewed digest scripts
+        description: Same-run artifact containing the four reviewed digest scripts
         required: false
         default: ''
         type: string
@@ -90,6 +90,7 @@ jobs:
           DIGEST_SCRIPTS = {
               "python/scripts/account_daily_digest.py",
               "python/scripts/account_daily_facts.py",
+              "python/scripts/azure_timer_digest.py",
               "python/scripts/cloud_run_daily_digest.py",
           }
 
@@ -112,7 +113,7 @@ jobs:
               files = {str(path.relative_to(root)): path.read_bytes()
                        for path in root.rglob("*") if path.is_file()}
               if files.keys() != DIGEST_SCRIPTS:
-                  raise ValueError("Expected exactly the three reviewed digest scripts")
+                  raise ValueError("Expected exactly the four reviewed digest scripts")
               output = BytesIO()
               with ZipFile(BytesIO(payload)) as source, ZipFile(output, "w") as target:
                   names = source.namelist()
