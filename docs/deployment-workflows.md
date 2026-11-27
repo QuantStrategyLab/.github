@@ -90,7 +90,8 @@ requires readback before another operation.
 
 The digest caller may pass `source-artifact`, a same-run artifact containing
 exactly `python/scripts/account_daily_digest.py`, `python/scripts/account_daily_facts.py`,
-and `python/scripts/cloud_run_daily_digest.py` from its reviewed main commit.
+`python/scripts/azure_timer_digest.py`, and `python/scripts/cloud_run_daily_digest.py`
+from its reviewed main commit.
 Grant that caller `actions: read`. The shared workflow replaces only those
 existing ZIP members and retains the other package contents and entry metadata.
 It uses uncompressed ZIP entries so the protected candidate digest is stable
