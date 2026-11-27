@@ -90,7 +90,7 @@ jobs:
           DIGEST_SCRIPTS = {
               "python/scripts/account_daily_digest.py",
               "python/scripts/account_daily_facts.py",
-              "python/scripts/azure_timer_digest.py",
+              "azure_timer_digest.py",
               "python/scripts/cloud_run_daily_digest.py",
           }
 
